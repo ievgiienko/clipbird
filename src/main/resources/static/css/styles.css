@@ -336,31 +336,6 @@ textarea {
     color: var(--text-muted);
 }
 
-/* --- Share bar --- */
-
-.share-bar {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0.75rem 1rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.share-url {
-    font-family: var(--mono);
-    font-size: 0.85rem;
-    color: var(--primary);
-    word-break: break-all;
-}
-
-.share-note {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-}
-
 /* --- Text info --- */
 
 .text-info {
@@ -373,6 +348,10 @@ textarea {
 
 /* --- Drop zone --- */
 
+.file-list:not(:empty) {
+    margin-bottom: 1rem;
+}
+
 .drop-zone {
     position: relative;
     border: 2px dashed var(--border);
@@ -381,7 +360,6 @@ textarea {
     text-align: center;
     transition: border-color 0.2s, background 0.2s;
     cursor: pointer;
-    margin-bottom: 1rem;
 }
 
 .drop-zone:hover {
@@ -753,10 +731,6 @@ textarea {
     .header-actions {
         width: 100%;
         justify-content: flex-start;
-    }
-
-    .share-bar {
-        font-size: 0.9rem;
     }
 
     .btn-large {

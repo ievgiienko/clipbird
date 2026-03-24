@@ -81,6 +81,9 @@ function bindEvents() {
         if (e.target === e.currentTarget) ui.hideDeleteModal();
     });
 
+    // Deleted overlay: Go Home button
+    document.getElementById('btn-deleted-go-home').addEventListener('click', cleanupAndGoHome);
+
     // Keyboard: Escape closes modals
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -101,9 +104,10 @@ function onEnterKey(inputId, handler) {
 function onRouteChange(route) {
     const state = getState();
 
-    // Clean up WS if navigating away from clipboard
+    // Clean up WS and overlays if navigating away from clipboard
     if (route.page !== 'clipboard') {
         if (ws) { ws.disconnect(); ws = null; }
+        ui.hideDeletedOverlay();
     }
 
     if (route.page === 'clipboard' && route.code) {

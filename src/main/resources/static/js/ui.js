@@ -27,7 +27,6 @@ export function showUnlockedState(clipboardCode) {
     document.getElementById('clipboard-locked').style.display = 'none';
     document.getElementById('clipboard-unlocked').style.display = 'block';
     setClipboardId(clipboardCode);
-    setShareUrl(clipboardCode);
 }
 
 // --- Status indicators ---
@@ -44,11 +43,6 @@ export function setDeviceCount(count) {
 
 export function setClipboardId(code) {
     document.getElementById('clipboard-id').textContent = code;
-}
-
-export function setShareUrl(code) {
-    const url = `${location.origin}/c/${code}`;
-    document.getElementById('share-url').textContent = url;
 }
 
 export function getClipboardUrl(code) {
