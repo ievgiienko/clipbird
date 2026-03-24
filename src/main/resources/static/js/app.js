@@ -1,6 +1,6 @@
 /**
  * Main application entry point.
- * Orchestrates all modules: crypto, api, ws, file-store, state, ui.
+ * Orchestrates all modules: crypto, api, ws, file-store, state, ui, router, qr.
  */
 
 import * as crypto from './crypto.js';
@@ -9,6 +9,8 @@ import { ClipboardWebSocket } from './ws.js';
 import * as fileStore from './file-store.js';
 import { getState, setState, resetState, generateDeviceId } from './state.js';
 import * as ui from './ui.js';
+import * as router from './router.js';
+import { generateQR, toSvg } from './qr.js';
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
 const TEXT_DEBOUNCE_MS = 500;
@@ -20,24 +22,113 @@ let ws = null;
 document.addEventListener('DOMContentLoaded', () => {
     setState({ deviceId: generateDeviceId() });
     bindEvents();
+    router.init(onRouteChange);
 });
 
 function bindEvents() {
+    // Create page
     document.getElementById('btn-create').addEventListener('click', handleCreate);
-    document.getElementById('btn-open').addEventListener('click', handleOpen);
-    document.getElementById('btn-delete').addEventListener('click', handleDelete);
-    document.getElementById('btn-back').addEventListener('click', handleBack);
-    document.getElementById('btn-add-file').addEventListener('click', () => document.getElementById('file-input').click());
-    document.getElementById('file-input').addEventListener('change', handleFilesSelected);
-    document.getElementById('clipboard-text').addEventListener('input', handleTextInput);
-    document.getElementById('btn-deleted-home').addEventListener('click', () => {
-        ui.hideDeletedOverlay();
-        goHome();
-    });
+    onEnterKey('create-password-confirm', handleCreate);
 
-    // Delegate file action clicks
+    // Open page
+    document.getElementById('btn-open').addEventListener('click', handleOpen);
+    onEnterKey('open-password', handleOpen);
+
+    // URL-based open (clipboard locked state)
+    document.getElementById('btn-url-open').addEventListener('click', handleUrlOpen);
+    onEnterKey('url-password', handleUrlOpen);
+
+    // Clipboard page
+    document.getElementById('btn-delete').addEventListener('click', () => ui.showDeleteModal());
+    document.getElementById('btn-copy-link').addEventListener('click', handleCopyLink);
+    document.getElementById('btn-show-qr').addEventListener('click', handleShowQr);
+    document.getElementById('clipboard-text').addEventListener('input', handleTextInput);
+
+    // File handling
+    document.getElementById('btn-add-file').addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('file-input').click();
+    });
+    document.getElementById('file-input').addEventListener('change', handleFilesSelected);
+
+    // Drag and drop
+    const dropZone = document.getElementById('drop-zone');
+    dropZone.addEventListener('dragenter', handleDragEnter);
+    dropZone.addEventListener('dragover', handleDragOver);
+    dropZone.addEventListener('dragleave', handleDragLeave);
+    dropZone.addEventListener('drop', handleDrop);
+
+    // Delegate file/transfer action clicks
     document.getElementById('file-list').addEventListener('click', handleFileAction);
     document.getElementById('transfer-list').addEventListener('click', handleTransferAction);
+
+    // QR modal
+    document.getElementById('btn-close-qr').addEventListener('click', ui.hideQrModal);
+    document.getElementById('btn-qr-copy').addEventListener('click', () => {
+        const state = getState();
+        ui.copyToClipboard(ui.getClipboardUrl(state.clipboardCode));
+    });
+    document.getElementById('qr-modal').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) ui.hideQrModal();
+    });
+
+    // Delete confirmation modal
+    document.getElementById('btn-confirm-delete').addEventListener('click', handleDelete);
+    document.getElementById('btn-cancel-delete').addEventListener('click', ui.hideDeleteModal);
+    document.getElementById('btn-close-delete').addEventListener('click', ui.hideDeleteModal);
+    document.getElementById('confirm-delete-modal').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) ui.hideDeleteModal();
+    });
+
+    // Keyboard: Escape closes modals
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            ui.hideQrModal();
+            ui.hideDeleteModal();
+        }
+    });
+}
+
+function onEnterKey(inputId, handler) {
+    document.getElementById(inputId).addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); handler(); }
+    });
+}
+
+// --- Route change handler ---
+
+function onRouteChange(route) {
+    const state = getState();
+
+    // Clean up WS if navigating away from clipboard
+    if (route.page !== 'clipboard') {
+        if (ws) { ws.disconnect(); ws = null; }
+    }
+
+    if (route.page === 'clipboard' && route.code) {
+        if (state.clipboardCode === route.code && state.cryptoKey) {
+            // Already authenticated for this clipboard
+            ui.showUnlockedState(route.code);
+        } else {
+            // Need password
+            ui.showLockedState(route.code);
+        }
+    }
+
+    if (route.page === 'create') {
+        document.getElementById('create-password').value = '';
+        document.getElementById('create-password-confirm').value = '';
+        ui.hideError('create-error');
+        setTimeout(() => document.getElementById('create-password').focus(), 50);
+    }
+
+    if (route.page === 'open') {
+        document.getElementById('open-code').value = '';
+        document.getElementById('open-password').value = '';
+        ui.hideError('open-error');
+        setTimeout(() => document.getElementById('open-code').focus(), 50);
+    }
 }
 
 // --- Create clipboard ---
@@ -47,13 +138,16 @@ async function handleCreate() {
     const confirm = document.getElementById('create-password-confirm').value;
 
     if (!password || password.length < 4) {
-        ui.showError('home-error', 'Password must be at least 4 characters');
+        ui.showError('create-error', 'Password must be at least 4 characters');
         return;
     }
     if (password !== confirm) {
-        ui.showError('home-error', 'Passwords do not match');
+        ui.showError('create-error', 'Passwords do not match');
         return;
     }
+
+    const btn = document.getElementById('btn-create');
+    btn.disabled = true;
 
     try {
         // Phase 1: Create clipboard (server generates salt)
@@ -74,44 +168,80 @@ async function handleCreate() {
             salt: result.salt,
         });
 
-        document.getElementById('create-password').value = '';
-        document.getElementById('create-password-confirm').value = '';
+        // Navigate to clipboard page
+        router.navigate(`/c/${result.clipboardCode}`);
 
-        openClipboardPage(result.clipboardCode, passwordHash);
+        // Connect after navigation (route handler will show unlocked state)
+        connectToClipboard(result.clipboardCode, passwordHash);
     } catch (err) {
-        ui.showError('home-error', err.message);
+        ui.showError('create-error', err.message);
+    } finally {
+        btn.disabled = false;
     }
 }
 
-// --- Open existing clipboard ---
+// --- Open existing clipboard (from /open page) ---
 
 async function handleOpen() {
     const code = document.getElementById('open-code').value.trim();
     const password = document.getElementById('open-password').value;
 
     if (!code) {
-        ui.showError('home-error', 'Please enter a clipboard ID');
+        ui.showError('open-error', 'Please enter a clipboard ID');
         return;
     }
     if (!password) {
-        ui.showError('home-error', 'Please enter the password');
+        ui.showError('open-error', 'Please enter the password');
         return;
     }
 
+    const btn = document.getElementById('btn-open');
+    btn.disabled = true;
+
+    try {
+        await authenticateAndOpen(code, password, 'open-error');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// --- Open clipboard from URL (locked state) ---
+
+async function handleUrlOpen() {
+    const route = router.getRoute();
+    const code = route.code;
+    const password = document.getElementById('url-password').value;
+
+    if (!password) {
+        ui.showError('locked-error', 'Please enter the password');
+        return;
+    }
+
+    const btn = document.getElementById('btn-url-open');
+    btn.disabled = true;
+
+    try {
+        await authenticateAndOpen(code, password, 'locked-error');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// --- Shared authentication flow ---
+
+async function authenticateAndOpen(code, password, errorElementId) {
     try {
         const handshake = await api.getHandshake(code);
 
         if (handshake.status !== 'ACTIVE') {
-            ui.showError('home-error', 'Clipboard is no longer active');
+            ui.showError(errorElementId, 'Clipboard is no longer active');
             return;
         }
 
-        // Compute password hash using server salt (same derivation as during creation)
         const passwordHash = await crypto.computePasswordHash(password, handshake.salt);
-
         const valid = await api.verifyPassword(code, passwordHash);
         if (!valid) {
-            ui.showError('home-error', 'Invalid password');
+            ui.showError(errorElementId, 'Invalid password');
             return;
         }
 
@@ -125,23 +255,26 @@ async function handleOpen() {
             salt: handshake.salt,
         });
 
-        document.getElementById('open-code').value = '';
-        document.getElementById('open-password').value = '';
+        // Navigate to clipboard page (if not already there)
+        if (location.pathname !== `/c/${code}`) {
+            router.navigate(`/c/${code}`);
+        } else {
+            // Already on the clipboard page, just switch to unlocked state
+            ui.showUnlockedState(code);
+        }
 
-        openClipboardPage(code, passwordHash);
+        connectToClipboard(code, passwordHash);
     } catch (err) {
-        ui.showError('home-error', err.message);
+        ui.showError(errorElementId, err.message);
     }
 }
 
-// --- Open clipboard page and connect ---
+// --- Connect and load clipboard ---
 
-async function openClipboardPage(clipboardCode, passwordHash) {
+async function connectToClipboard(clipboardCode, passwordHash) {
     const state = getState();
 
-    ui.showPage('clipboard-page');
-    ui.setClipboardId(clipboardCode);
-    setState({ currentPage: 'clipboard' });
+    ui.showUnlockedState(clipboardCode);
 
     // Connect WebSocket
     ws = new ClipboardWebSocket();
@@ -197,7 +330,6 @@ function setupWsHandlers(ws) {
     ws.on('device_joined', (msg) => {
         setState({ connectedDevices: msg.connectedDevices });
         ui.setDeviceCount(msg.connectedDevices);
-        // Refresh file list to update source online status
         refreshFileList();
     });
 
@@ -210,7 +342,6 @@ function setupWsHandlers(ws) {
     ws.on('text_updated', async (msg) => {
         const state = getState();
         if (msg.updatedBy === state.deviceId) {
-            // Just update version
             setState({ textVersion: msg.version });
             ui.setTextVersion(msg.version);
             return;
@@ -228,8 +359,7 @@ function setupWsHandlers(ws) {
 
     ws.on('file_added', async (msg) => {
         const state = getState();
-        const file = msg.file;
-        state.files.push(file);
+        state.files.push(msg.file);
         await ui.renderFileList(state.files);
     });
 
@@ -250,7 +380,7 @@ function setupWsHandlers(ws) {
 
     ws.on('auth_failed', () => {
         ui.showError('clipboard-error', 'Authentication failed. Wrong password.');
-        goHome();
+        cleanupAndGoHome();
     });
 
     // Transfer signaling
@@ -269,7 +399,6 @@ function handleTextInput() {
     const text = ui.getTextContent();
     ui.setTextSize(new TextEncoder().encode(text).length);
 
-    // Debounce
     if (state.textUpdateTimer) clearTimeout(state.textUpdateTimer);
     setState({
         textUpdateTimer: setTimeout(() => sendTextUpdate(text), TEXT_DEBOUNCE_MS)
@@ -295,8 +424,7 @@ async function sendTextUpdate(text) {
 
 // --- File handling ---
 
-async function handleFilesSelected(event) {
-    const files = event.target.files;
+async function processFiles(files) {
     if (!files || files.length === 0) return;
 
     const state = getState();
@@ -304,13 +432,11 @@ async function handleFilesSelected(event) {
         try {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-            // Encrypt file name and mime type
             const encName = await crypto.encryptString(state.cryptoKey, file.name);
             const encMime = file.type
                 ? await crypto.encryptString(state.cryptoKey, file.type)
                 : { ciphertext: '', iv: '' };
 
-            // Register file on server
             const manifest = await api.addFile(state.clipboardCode, {
                 encryptedName: encName.ciphertext,
                 encryptedNameIv: encName.iv,
@@ -321,26 +447,65 @@ async function handleFilesSelected(event) {
                 sourceDeviceId: state.deviceId
             });
 
-            // Store file locally in IndexedDB
             await fileStore.storeFile(manifest.fileCode, file);
 
-            // Update local state
             state.files.push(manifest);
             await ui.renderFileList(state.files);
 
-            // Notify other devices via WebSocket
-            ws.send({
-                type: 'file_added',
-                file: manifest
-            });
+            ws.send({ type: 'file_added', file: manifest });
         } catch (err) {
             ui.showError('clipboard-error', 'Failed to add file: ' + err.message);
         }
     }
+}
 
-    // Reset file input
+async function handleFilesSelected(event) {
+    await processFiles(event.target.files);
     event.target.value = '';
 }
+
+// --- Drag and drop ---
+
+function handleDragEnter(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    ui.setDropZoneActive(true);
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    ui.setDropZoneActive(true);
+}
+
+function handleDragLeave(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only deactivate if leaving the drop zone entirely
+    const dz = document.getElementById('drop-zone');
+    if (!dz.contains(e.relatedTarget)) {
+        ui.setDropZoneActive(false);
+    }
+}
+
+async function handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    ui.setDropZoneActive(false);
+
+    const state = getState();
+    if (!state.cryptoKey || !ws || !ws.isConnected()) {
+        ui.showError('clipboard-error', 'Connect to a clipboard before adding files');
+        return;
+    }
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+        await processFiles(files);
+    }
+}
+
+// --- File actions ---
 
 function handleFileAction(event) {
     const btn = event.target.closest('button[data-action]');
@@ -349,11 +514,8 @@ function handleFileAction(event) {
     const action = btn.dataset.action;
     const fileCode = btn.dataset.fileCode;
 
-    if (action === 'download') {
-        startDownload(fileCode);
-    } else if (action === 'remove') {
-        removeFile(fileCode);
-    }
+    if (action === 'download') startDownload(fileCode);
+    else if (action === 'remove') removeFile(fileCode);
 }
 
 function handleTransferAction(event) {
@@ -361,8 +523,7 @@ function handleTransferAction(event) {
     if (!btn) return;
 
     if (btn.dataset.action === 'cancel-transfer') {
-        const transferCode = btn.dataset.transferCode;
-        ws.send({ type: 'transfer_cancel', transferCode });
+        ws.send({ type: 'transfer_cancel', transferCode: btn.dataset.transferCode });
     }
 }
 
@@ -389,7 +550,6 @@ async function startDownload(fileCode) {
     try {
         const transfer = await api.createTransfer(state.clipboardCode, fileCode, state.deviceId);
 
-        // Track transfer
         let fileName = fileCode;
         try {
             fileName = await crypto.decryptString(state.cryptoKey, file.encryptedName, file.encryptedNameIv);
@@ -404,7 +564,6 @@ async function startDownload(fileCode) {
         });
         ui.renderTransfers(state.activeTransfers);
 
-        // Request first chunk via WebSocket
         ws.send({
             type: 'transfer_request',
             transferCode: transfer.transferCode,
@@ -417,28 +576,22 @@ async function startDownload(fileCode) {
     }
 }
 
-// --- File upload (source device - responding to chunk requests) ---
+// --- File upload (source device) ---
 
 async function handleSendChunkRequest(msg) {
     const state = getState();
     const { transferCode, fileCode, chunkNo } = msg;
 
     try {
-        // Read chunk from local file
         const file = state.files.find(f => f.fileCode === fileCode);
         const chunkSize = file ? file.chunkSize : CHUNK_SIZE;
         const chunkData = await fileStore.readChunk(fileCode, chunkNo, chunkSize);
 
-        // Encrypt chunk
         const encrypted = await crypto.encryptChunk(state.cryptoKey, chunkData);
-
-        // Upload to relay
         await api.uploadChunk(transferCode, chunkNo, encrypted.data, encrypted.iv);
 
-        // Get transfer info to find target device
         const transfer = await api.getTransfer(transferCode);
 
-        // Notify target that chunk is ready
         ws.send({
             type: 'chunk_uploaded',
             transferCode,
@@ -451,7 +604,7 @@ async function handleSendChunkRequest(msg) {
     }
 }
 
-// --- Chunk ready (target device receives notification) ---
+// --- Chunk ready (target device) ---
 
 async function handleChunkReady(msg) {
     const state = getState();
@@ -460,17 +613,13 @@ async function handleChunkReady(msg) {
     if (!transfer) return;
 
     try {
-        // Download chunk from relay
         const chunk = await api.downloadChunk(transferCode, chunkNo);
-
-        // Decrypt chunk
         const decrypted = await crypto.decryptChunk(state.cryptoKey, chunk.data, chunk.iv);
         transfer.chunks.push(new Uint8Array(decrypted));
         transfer.currentChunk = chunkNo + 1;
         transfer.status = `${chunkNo + 1}/${transfer.totalChunks}`;
         ui.renderTransfers(state.activeTransfers);
 
-        // Acknowledge chunk — server will request next or complete
         ws.send({ type: 'chunk_ack', transferCode });
     } catch (err) {
         console.error('Failed to download chunk:', err);
@@ -491,10 +640,7 @@ async function handleTransferComplete(msg) {
     }
 
     try {
-        // Reconstruct file from chunks
         const blob = new Blob(transfer.chunks);
-
-        // Trigger browser download
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -520,7 +666,7 @@ function handleTransferCancelled(msg) {
     ui.showInfo('Transfer cancelled');
 }
 
-// --- Refresh file list with updated source status ---
+// --- Refresh file list ---
 
 async function refreshFileList() {
     const state = getState();
@@ -532,12 +678,31 @@ async function refreshFileList() {
     } catch { /* ignore refresh errors */ }
 }
 
+// --- Copy link ---
+
+function handleCopyLink() {
+    const state = getState();
+    ui.copyToClipboard(ui.getClipboardUrl(state.clipboardCode));
+}
+
+// --- QR code ---
+
+function handleShowQr() {
+    const state = getState();
+    const url = ui.getClipboardUrl(state.clipboardCode);
+    try {
+        const matrix = generateQR(url);
+        const svg = toSvg(matrix, 6);
+        ui.showQrModal(svg, url);
+    } catch (err) {
+        ui.showError('clipboard-error', 'Failed to generate QR code: ' + err.message);
+    }
+}
+
 // --- Delete clipboard ---
 
-async function handleDelete() {
-    if (!confirm('Are you sure you want to permanently delete this clipboard?')) return;
-
-    const state = getState();
+function handleDelete() {
+    ui.hideDeleteModal();
     try {
         ws.send({ type: 'delete_clipboard' });
     } catch (err) {
@@ -545,14 +710,10 @@ async function handleDelete() {
     }
 }
 
-// --- Navigation ---
+// --- Navigation helpers ---
 
-function handleBack() {
-    if (ws) ws.disconnect();
-    goHome();
-}
-
-function goHome() {
+function cleanupAndGoHome() {
+    if (ws) { ws.disconnect(); ws = null; }
     resetState();
     setState({ deviceId: generateDeviceId() });
     fileStore.clearAll();
@@ -561,5 +722,5 @@ function goHome() {
     ui.setConnectionStatus(false);
     ui.setDeviceCount(0);
     ui.hideDeletedOverlay();
-    ui.showPage('home-page');
+    router.navigate('/');
 }

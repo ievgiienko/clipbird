@@ -9,6 +9,10 @@ An end-to-end encrypted, real-time clipboard sharing system. Share text and file
 - **File transfer**: Chunked, encrypted peer-to-peer file relay through the server
 - **Zero-knowledge server**: The server stores only ciphertext, salts, and metadata
 - **Short clipboard IDs**: User-friendly 8-character alphanumeric codes
+- **Shareable clipboard URLs**: Each clipboard has a unique URL (`/c/{id}`) for easy sharing
+- **QR code sharing**: Generate a QR code for the clipboard URL to open on mobile
+- **Drag-and-drop files**: Drop files directly into the browser to share them
+- **Responsive UI**: Works on desktop, tablet, and mobile
 - **Auto-expiration**: Clipboards automatically expire after a configurable TTL
 - **Multiple clipboards**: Support for many simultaneous clipboard sessions
 
@@ -78,7 +82,7 @@ secure-clipboard/
 ├── src/main/resources/
 │   ├── static/          # Frontend (HTML, CSS, JS)
 │   │   ├── css/
-│   │   ├── js/          # Modular JS (crypto, api, ws, state, ui, app)
+│   │   ├── js/          # Modular JS (crypto, api, ws, state, ui, app, router, qr)
 │   │   └── index.html
 │   ├── db/migration/    # Flyway SQL migrations
 │   └── application.yml  # Configuration
@@ -118,6 +122,17 @@ secure-clipboard/
 6. File names and MIME types are also encrypted
 7. The server only stores ciphertext, IVs, salts, and sync metadata
 
+## Frontend Routes
+
+| Route | Description |
+|-------|-------------|
+| `/` | Landing page with product overview and CTAs |
+| `/create` | Create a new clipboard (password entry) |
+| `/open` | Open existing clipboard by ID + password |
+| `/c/{clipboardId}` | Direct clipboard URL (prompts for password if not authenticated) |
+
+All routes are handled client-side via the History API. The Spring backend forwards `/create`, `/open`, and `/c/{code}` to `index.html` so that deep linking works.
+
 ## Known MVP Limitations
 
 - Source device must remain online for file downloads to work
@@ -130,6 +145,8 @@ secure-clipboard/
 - Large file support depends on browser memory and IndexedDB capacity
 - No user accounts or persistent sessions
 - Single-server only (no horizontal scaling without Redis)
+- QR code generator is a custom JS implementation (no external library) — supports URLs up to ~200 bytes
+- Drag-and-drop supports files only, not folders
 
 ## Configuration
 
