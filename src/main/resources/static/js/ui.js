@@ -13,6 +13,23 @@ export function showPage(pageId) {
     if (page) page.classList.add('active');
 }
 
+// --- Clipboard locked/unlocked states ---
+
+export function showLockedState(clipboardCode) {
+    document.getElementById('clipboard-locked').style.display = 'block';
+    document.getElementById('clipboard-unlocked').style.display = 'none';
+    document.getElementById('locked-clipboard-id').textContent = clipboardCode;
+    document.getElementById('url-password').value = '';
+    document.getElementById('url-password').focus();
+}
+
+export function showUnlockedState(clipboardCode) {
+    document.getElementById('clipboard-locked').style.display = 'none';
+    document.getElementById('clipboard-unlocked').style.display = 'block';
+    setClipboardId(clipboardCode);
+    setShareUrl(clipboardCode);
+}
+
 // --- Status indicators ---
 
 export function setConnectionStatus(connected) {
@@ -27,6 +44,15 @@ export function setDeviceCount(count) {
 
 export function setClipboardId(code) {
     document.getElementById('clipboard-id').textContent = code;
+}
+
+export function setShareUrl(code) {
+    const url = `${location.origin}/c/${code}`;
+    document.getElementById('share-url').textContent = url;
+}
+
+export function getClipboardUrl(code) {
+    return `${location.origin}/c/${code}`;
 }
 
 export function setTextVersion(version) {
@@ -44,6 +70,7 @@ export function setTextSize(bytes) {
 
 export function showError(elementId, message) {
     const el = document.getElementById(elementId);
+    if (!el) return;
     el.textContent = message;
     el.style.display = 'block';
     setTimeout(() => { el.style.display = 'none'; }, 8000);
@@ -57,7 +84,62 @@ export function showInfo(message) {
 }
 
 export function hideError(elementId) {
-    document.getElementById(elementId).style.display = 'none';
+    const el = document.getElementById(elementId);
+    if (el) el.style.display = 'none';
+}
+
+// --- Copy to clipboard ---
+
+export async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        showCopyFeedback();
+        return true;
+    } catch {
+        // Fallback for older browsers
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showCopyFeedback();
+        return true;
+    }
+}
+
+function showCopyFeedback() {
+    const existing = document.querySelector('.copy-feedback');
+    if (existing) existing.remove();
+
+    const el = document.createElement('div');
+    el.className = 'copy-feedback';
+    el.textContent = 'Copied to clipboard';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2000);
+}
+
+// --- QR Modal ---
+
+export function showQrModal(svgHtml, url) {
+    document.getElementById('qr-code').innerHTML = svgHtml;
+    document.getElementById('qr-url').textContent = url;
+    document.getElementById('qr-modal').style.display = 'flex';
+}
+
+export function hideQrModal() {
+    document.getElementById('qr-modal').style.display = 'none';
+}
+
+// --- Delete confirmation modal ---
+
+export function showDeleteModal() {
+    document.getElementById('confirm-delete-modal').style.display = 'flex';
+}
+
+export function hideDeleteModal() {
+    document.getElementById('confirm-delete-modal').style.display = 'none';
 }
 
 // --- Text area ---
@@ -71,6 +153,26 @@ export function setTextContent(text) {
     setTextSize(new TextEncoder().encode(text).length);
 }
 
+// --- Drop zone ---
+
+export function setDropZoneActive(active) {
+    const dz = document.getElementById('drop-zone');
+    if (active) {
+        dz.classList.add('drag-over');
+    } else {
+        dz.classList.remove('drag-over');
+    }
+}
+
+export function setDropZoneEnabled(enabled) {
+    const dz = document.getElementById('drop-zone');
+    if (enabled) {
+        dz.classList.remove('disabled');
+    } else {
+        dz.classList.add('disabled');
+    }
+}
+
 // --- File list ---
 
 export async function renderFileList(files) {
@@ -78,7 +180,7 @@ export async function renderFileList(files) {
     const state = getState();
 
     if (!files || files.length === 0) {
-        container.innerHTML = '<p class="empty-state">No files added yet</p>';
+        container.innerHTML = '';
         return;
     }
 
@@ -104,7 +206,11 @@ export async function renderFileList(files) {
         el.innerHTML = `
             <div class="file-info">
                 <div class="file-name">${escapeHtml(fileName)}</div>
-                <div class="file-meta">${sizeStr} &middot; ${file.totalChunks} chunks ${sourceStatus}</div>
+                <div class="file-meta">
+                    <span>${sizeStr}</span>
+                    <span>${file.totalChunks} chunk${file.totalChunks !== 1 ? 's' : ''}</span>
+                    ${sourceStatus}
+                </div>
             </div>
             <div class="file-actions">
                 ${!isOwn && file.sourceOnline ? `<button class="btn btn-small btn-primary" data-action="download" data-file-code="${file.fileCode}">Download</button>` : ''}
@@ -140,8 +246,8 @@ export function renderTransfers(transfers) {
 
         el.innerHTML = `
             <div>${direction}: ${escapeHtml(transfer.fileName || transfer.fileCode)}</div>
-            <div style="font-size:0.8rem;color:var(--text-muted)">
-                Chunk ${transfer.currentChunk}/${transfer.totalChunks} &middot; ${transfer.status}
+            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem">
+                Chunk ${transfer.currentChunk}/${transfer.totalChunks}
                 <button class="btn btn-small btn-danger" data-action="cancel-transfer" data-transfer-code="${code}" style="margin-left:0.5rem">Cancel</button>
             </div>
             <div class="transfer-progress">

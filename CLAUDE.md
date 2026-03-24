@@ -67,7 +67,8 @@ Only one encrypted chunk is held server-side at any time per transfer.
 - **DTOs**: Java records in `dto/` package. All API input uses `@Valid` with Jakarta validation.
 - **Entities**: Standard JPA with `@PrePersist` lifecycle hooks. Clipboard deletion sets status to DELETED and explicitly clears the text snapshot reference before flushing to avoid Hibernate cascade issues.
 - **WebSocket protocol**: JSON messages with a `type` field for routing. Handler switches on type string in `ClipboardWebSocketHandler`.
-- **Frontend**: Vanilla ES modules (no build step). `app.js` orchestrates; `crypto.js` handles all Web Crypto API calls.
+- **Frontend**: Vanilla ES modules (no build step). `app.js` orchestrates; `crypto.js` handles all Web Crypto API calls; `router.js` handles SPA routing; `qr.js` generates QR codes.
+- **SPA Routing**: `SpaController` forwards `/create`, `/open`, `/c/{code}` to `index.html`. Client-side router (`router.js`) uses History API to show the correct page. Links with `data-link` attribute are intercepted by the router.
 - **Config**: All app-specific settings are under `app.*` prefix in `application.yml`, bound via `AppProperties` (@ConfigurationProperties). All configurable via environment variables.
 
 ## Test Setup
