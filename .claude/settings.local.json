@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn --version)",
+      "Bash(java:*)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Java/jdk-17\" PATH=\"$JAVA_HOME/bin:$PATH\" java -version 2>&1)",
+      "Bash(\"C:/Program Files/Java/jdk-17/bin/java\" -version 2>&1)",
+      "Bash(export JAVA_HOME=\"C:/Program Files/Java/jdk-17\")",
+      "Bash(mvn clean:*)",
+      "Bash(mvn compile:*)",
+      "Bash(mvn test:*)",
+      "Bash(mvn package:*)",
+      "WebSearch",
+      "Bash(\"C:/Program Files/Java/jdk-26/bin/java\" -version 2>&1)",
+      "Bash(export JAVA_HOME=\"C:/Program Files/Java/jdk-26\")",
+      "Bash(mvn dependency:tree)",
+      "Bash(export 'JAVA_HOME=C:/Program Files/Java/jdk-26')",
+      "Bash(jar tf:*)",
+      "Bash(find ~/.m2/repository/org/springframework/boot -name *.jar -path *4.0.4*)",
+      "Bash(mvn dependency:resolve -Dclassifier=test)",
+      "Bash(mvn dependency:resolve)",
+      "Bash(\"C:/Program Files/Java/jdk-26/bin/jar\" tf ~/.m2/repository/org/springframework/boot/spring-boot-test-autoconfigure/4.0.4/spring-boot-test-autoconfigure-4.0.4.jar)",
+      "Bash(mvn dependency:resolve -DincludeArtifactIds=spring-boot-starter-webmvc-test)",
+      "Bash(mvn dependency:get -Dartifact=org.springframework.boot:spring-boot-webmvc-test-autoconfigure:4.0.4)",
+      "Bash(mvn dependency:get -Dartifact=org.springframework.boot:spring-boot-servlet-test:4.0.4)",
+      "Bash(mvn dependency:get -Dartifact=org.springframework.boot:spring-boot-webmvc-test:4.0.4)",
+      "Bash(\"C:/Program Files/Java/jdk-26/bin/jar\" tf ~/.m2/repository/org/springframework/boot/spring-boot-webmvc-test/4.0.4/spring-boot-webmvc-test-4.0.4.jar)",
+      "Bash(mvn spring-boot:run)",
+      "Bash(mvn spring-boot:run -Dspring-boot.run.arguments=\"--logging.level.org.flywaydb=DEBUG --logging.level.org.springframework.boot.autoconfigure.flyway=DEBUG\")",
+      "Bash(mvn spring-boot:run -Dspring-boot.run.arguments=\"--debug\")",
+      "Bash(mvn dependency:get -Dartifact=org.springframework.boot:spring-boot-flyway:4.0.4)",
+      "Bash(\"C:/Program Files/Java/jdk-26/bin/jar\" tf ~/.m2/repository/org/springframework/boot/spring-boot-flyway/4.0.4/spring-boot-flyway-4.0.4.jar)",
+      "Bash('C:/Program Files/Java/jdk-26/bin/jar' xf ~/.m2/repository/org/springframework/boot/spring-boot-flyway/4.0.4/spring-boot-flyway-4.0.4.jar org/springframework/boot/flyway/autoconfigure/FlywayProperties.class -C /tmp/)",
+      "Bash('C:/Program Files/Java/jdk-26/bin/javap' -p /tmp/org/springframework/boot/flyway/autoconfigure/FlywayProperties.class)",
+      "Bash('C:/Program Files/Java/jdk-26/bin/javap' -verbose /tmp/org/springframework/boot/flyway/autoconfigure/FlywayProperties.class)",
+      "Bash(curl:*)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill:*)"
+    ]
+  }
+}

@@ -1,0 +1,179 @@
+/**
+ * UI manipulation helpers.
+ */
+
+import { getState } from './state.js';
+import { decryptString } from './crypto.js';
+
+// --- Page navigation ---
+
+export function showPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const page = document.getElementById(pageId);
+    if (page) page.classList.add('active');
+}
+
+// --- Status indicators ---
+
+export function setConnectionStatus(connected) {
+    const el = document.getElementById('connection-status');
+    el.textContent = connected ? 'Connected' : 'Disconnected';
+    el.className = 'status ' + (connected ? 'connected' : 'disconnected');
+}
+
+export function setDeviceCount(count) {
+    document.getElementById('device-count').textContent = `${count} device${count !== 1 ? 's' : ''}`;
+}
+
+export function setClipboardId(code) {
+    document.getElementById('clipboard-id').textContent = code;
+}
+
+export function setTextVersion(version) {
+    document.getElementById('text-version').textContent = `Version: ${version}`;
+}
+
+export function setTextSize(bytes) {
+    const size = bytes < 1024 ? `${bytes} B` :
+                 bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` :
+                 `${(bytes / 1048576).toFixed(1)} MB`;
+    document.getElementById('text-size').textContent = size;
+}
+
+// --- Error/Info display ---
+
+export function showError(elementId, message) {
+    const el = document.getElementById(elementId);
+    el.textContent = message;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 8000);
+}
+
+export function showInfo(message) {
+    const el = document.getElementById('clipboard-info');
+    el.textContent = message;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
+export function hideError(elementId) {
+    document.getElementById(elementId).style.display = 'none';
+}
+
+// --- Text area ---
+
+export function getTextContent() {
+    return document.getElementById('clipboard-text').value;
+}
+
+export function setTextContent(text) {
+    document.getElementById('clipboard-text').value = text;
+    setTextSize(new TextEncoder().encode(text).length);
+}
+
+// --- File list ---
+
+export async function renderFileList(files) {
+    const container = document.getElementById('file-list');
+    const state = getState();
+
+    if (!files || files.length === 0) {
+        container.innerHTML = '<p class="empty-state">No files added yet</p>';
+        return;
+    }
+
+    container.innerHTML = '';
+    for (const file of files) {
+        const el = document.createElement('div');
+        el.className = 'file-item';
+        el.dataset.fileCode = file.fileCode;
+
+        let fileName = file.fileCode;
+        try {
+            if (state.cryptoKey && file.encryptedName) {
+                fileName = await decryptString(state.cryptoKey, file.encryptedName, file.encryptedNameIv);
+            }
+        } catch { /* use fileCode as fallback */ }
+
+        const isOwn = file.sourceDeviceId === state.deviceId;
+        const sizeStr = formatBytes(file.sizeBytes);
+        const sourceStatus = file.sourceOnline
+            ? '<span class="file-source-status online">Source online</span>'
+            : '<span class="file-source-status offline">Source offline</span>';
+
+        el.innerHTML = `
+            <div class="file-info">
+                <div class="file-name">${escapeHtml(fileName)}</div>
+                <div class="file-meta">${sizeStr} &middot; ${file.totalChunks} chunks ${sourceStatus}</div>
+            </div>
+            <div class="file-actions">
+                ${!isOwn && file.sourceOnline ? `<button class="btn btn-small btn-primary" data-action="download" data-file-code="${file.fileCode}">Download</button>` : ''}
+                ${!isOwn && !file.sourceOnline ? `<button class="btn btn-small btn-secondary" disabled>Unavailable</button>` : ''}
+                ${isOwn ? `<button class="btn btn-small btn-danger" data-action="remove" data-file-code="${file.fileCode}">Remove</button>` : ''}
+            </div>
+        `;
+        container.appendChild(el);
+    }
+}
+
+// --- Transfer list ---
+
+export function renderTransfers(transfers) {
+    const section = document.getElementById('transfer-section');
+    const container = document.getElementById('transfer-list');
+
+    if (transfers.size === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    container.innerHTML = '';
+
+    for (const [code, transfer] of transfers) {
+        const el = document.createElement('div');
+        el.className = 'transfer-item';
+        const progress = transfer.totalChunks > 0
+            ? Math.round((transfer.currentChunk / transfer.totalChunks) * 100)
+            : 0;
+        const direction = transfer.direction === 'upload' ? 'Sending' : 'Receiving';
+
+        el.innerHTML = `
+            <div>${direction}: ${escapeHtml(transfer.fileName || transfer.fileCode)}</div>
+            <div style="font-size:0.8rem;color:var(--text-muted)">
+                Chunk ${transfer.currentChunk}/${transfer.totalChunks} &middot; ${transfer.status}
+                <button class="btn btn-small btn-danger" data-action="cancel-transfer" data-transfer-code="${code}" style="margin-left:0.5rem">Cancel</button>
+            </div>
+            <div class="transfer-progress">
+                <div class="transfer-progress-bar" style="width:${progress}%"></div>
+            </div>
+        `;
+        container.appendChild(el);
+    }
+}
+
+// --- Overlay ---
+
+export function showDeletedOverlay() {
+    document.getElementById('deleted-overlay').style.display = 'flex';
+}
+
+export function hideDeletedOverlay() {
+    document.getElementById('deleted-overlay').style.display = 'none';
+}
+
+// --- Helpers ---
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
