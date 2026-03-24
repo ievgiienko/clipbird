@@ -3,17 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Clipboard</title>
+    <title>ClipBird — Secure Online Clipboard</title>
+    <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
     <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
+    <!-- Header -->
+    <header class="site-header">
+        <div class="header-container">
+            <a href="/" data-link class="site-logo">
+                <img src="/img/icon.svg" alt="" class="site-logo-icon" width="32" height="32">
+                <span class="site-logo-text">Clip<span class="accent">Bird</span></span>
+            </a>
+            <nav class="site-nav">
+                <a href="/create" data-link class="nav-link">Create</a>
+                <a href="/open" data-link class="nav-link">Open</a>
+            </nav>
+        </div>
+    </header>
+
     <!-- Landing Page -->
     <div id="landing-page" class="page active">
         <div class="container">
             <div class="hero">
-                <h1 class="hero-title">Secure Clipboard</h1>
+                <h1 class="hero-title">Clip<span class="accent">Bird</span></h1>
                 <p class="hero-subtitle">
-                    Encrypted clipboard sharing between your devices.
+                    Secure clipboard sharing between your devices.
                     Text and files are encrypted in your browser before anything leaves it.
                 </p>
                 <div class="hero-actions">
@@ -225,6 +240,15 @@
             <button id="btn-deleted-go-home" class="btn btn-primary">Go Home</button>
         </div>
     </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-container">
+            <span>&copy; ClipBird</span>
+            <span class="footer-sep">&middot;</span>
+            <span class="footer-tagline">Secure clipboard between your devices</span>
+        </div>
+    </footer>
 
     <script type="module" src="/js/app.js"></script>
 </body>
