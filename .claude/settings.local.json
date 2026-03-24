@@ -37,7 +37,12 @@
       "Bash(netstat -ano)",
       "Bash(taskkill:*)",
       "Bash(git checkout:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(node:*)",
+      "Bash(cd /tmp)",
+      "Bash(npm install:*)",
+      "Bash(node --input-type=module -e \":*)",
+      "Bash(cd:*)"
     ]
   }
 }

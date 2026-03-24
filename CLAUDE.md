@@ -24,7 +24,7 @@ mvn test -Dtest=ClipboardServiceTest#shouldCreateClipboard
 mvn compile
 
 # Start with Docker Compose (MySQL + app)
-cp .env.example .env
+bash init-env.sh   # generates .env with random DB passwords
 docker compose up --build -d
 ```
 
