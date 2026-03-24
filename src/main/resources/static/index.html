@@ -144,11 +144,6 @@
                 </div>
             </div>
 
-            <div class="share-bar">
-                <span class="share-url" id="share-url"></span>
-                <span class="share-note">Share this link. Password must be entered separately.</span>
-            </div>
-
             <!-- Text Section -->
             <div class="card">
                 <h2>Text</h2>
@@ -162,6 +157,7 @@
             <!-- Files Section -->
             <div class="card">
                 <h2>Files</h2>
+                <div id="file-list" class="file-list"></div>
                 <div id="drop-zone" class="drop-zone">
                     <input type="file" id="file-input" multiple>
                     <div class="drop-zone-content">
@@ -170,7 +166,6 @@
                         <p class="drop-zone-hint">Files stay on your device until another device requests download</p>
                     </div>
                 </div>
-                <div id="file-list" class="file-list"></div>
             </div>
 
             <!-- Transfer Status -->
@@ -227,7 +222,7 @@
         <div class="overlay-content">
             <h2>Clipboard Deleted</h2>
             <p>This clipboard has been permanently deleted.</p>
-            <a href="/" data-link class="btn btn-primary">Go Home</a>
+            <button id="btn-deleted-go-home" class="btn btn-primary">Go Home</button>
         </div>
     </div>
 
