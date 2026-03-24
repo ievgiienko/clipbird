@@ -36,7 +36,8 @@
       "Bash(curl:*)",
       "Bash(netstat -ano)",
       "Bash(taskkill:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(wc:*)"
     ]
   }
 }
