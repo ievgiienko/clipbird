@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
@@ -22,17 +23,20 @@ public class CleanupService {
     private final ClipboardFileRepository fileRepo;
     private final ChunkTransferRepository transferRepo;
     private final DeviceSessionManager sessionManager;
+    private final AppProperties appProps;
 
     public CleanupService(ClipboardRepository clipboardRepo,
                           ClipboardTextSnapshotRepository textRepo,
                           ClipboardFileRepository fileRepo,
                           ChunkTransferRepository transferRepo,
-                          DeviceSessionManager sessionManager) {
+                          DeviceSessionManager sessionManager,
+                          AppProperties appProps) {
         this.clipboardRepo = clipboardRepo;
         this.textRepo = textRepo;
         this.fileRepo = fileRepo;
         this.transferRepo = transferRepo;
         this.sessionManager = sessionManager;
+        this.appProps = appProps;
     }
 
     @Scheduled(fixedDelayString = "${app.cleanup.interval-seconds:300}000")
@@ -56,6 +60,45 @@ public class CleanupService {
         if (!expired.isEmpty()) {
             log.info("Cleaned up {} expired clipboards", expired.size());
         }
+    }
+
+    @Scheduled(fixedDelayString = "${app.cleanup.interval-seconds:300}000")
+    @Transactional
+    public void purgeDeletedClipboards() {
+        if (!appProps.getCleanup().isHardDeleteEnabled()) {
+            return;
+        }
+
+        int delayHours = appProps.getCleanup().getHardDeleteDelayHours();
+        Instant cutoff = Instant.now().minus(delayHours, ChronoUnit.HOURS);
+
+        List<Clipboard> eligible = clipboardRepo.findByStatusInAndExpiresAtBefore(
+            List.of(ClipboardStatus.DELETED, ClipboardStatus.EXPIRED), cutoff);
+
+        if (eligible.isEmpty()) {
+            return;
+        }
+
+        log.info("Hard-delete cleanup: found {} eligible clipboards", eligible.size());
+
+        int purged = 0;
+        for (Clipboard clipboard : eligible) {
+            try {
+                Long clipId = clipboard.getId();
+                String code = clipboard.getClipboardCode();
+                // Remove any remaining child records (safety net; normally already cleaned up)
+                transferRepo.deleteByClipboardId(clipId);
+                fileRepo.deleteByClipboardId(clipId);
+                textRepo.deleteByClipboardId(clipId);
+                clipboardRepo.delete(clipboard);
+                purged++;
+                log.debug("Hard-deleted clipboard: {}", code);
+            } catch (Exception e) {
+                log.warn("Failed to hard-delete clipboard id={}: {}", clipboard.getId(), e.getMessage());
+            }
+        }
+
+        log.info("Hard-delete cleanup: purged {}/{} clipboards", purged, eligible.size());
     }
 
     @Scheduled(fixedDelayString = "${app.cleanup.interval-seconds:300}000")

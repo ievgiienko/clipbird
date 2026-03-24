@@ -23,6 +23,8 @@ app:
   cleanup:
     interval-seconds: 3600
     transfer-timeout-seconds: 600
+    hard-delete-enabled: true
+    hard-delete-delay-hours: 168
   rate-limit:
     max-creates-per-minute: 100
     max-opens-per-minute: 100

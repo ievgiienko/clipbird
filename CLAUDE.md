@@ -60,7 +60,10 @@ Only one encrypted chunk is held server-side at any time per transfer.
 
 ### Cleanup
 
-`CleanupService` runs scheduled tasks to expire clipboards past TTL and fail abandoned transfers. Interval and timeout are configurable via `app.cleanup.*` properties.
+`CleanupService` runs three scheduled tasks:
+1. **Expire active clipboards** past TTL — sets status to EXPIRED, removes child records (text snapshots, files, transfers), closes WebSocket sessions.
+2. **Fail abandoned transfers** — marks expired in-progress transfers as FAILED, clears temp chunk data.
+3. **Hard-delete old clipboards** — permanently removes DELETED/EXPIRED clipboard rows (and any remaining child records) after a configurable retention period (`app.cleanup.hard-delete-delay-hours`, default 168h / 7 days). This frees clipboard codes for reuse. Can be disabled via `app.cleanup.hard-delete-enabled: false`.
 
 ## Key Conventions
 

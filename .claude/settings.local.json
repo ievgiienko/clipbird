@@ -35,7 +35,8 @@
       "Bash('C:/Program Files/Java/jdk-26/bin/javap' -verbose /tmp/org/springframework/boot/flyway/autoconfigure/FlywayProperties.class)",
       "Bash(curl:*)",
       "Bash(netstat -ano)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

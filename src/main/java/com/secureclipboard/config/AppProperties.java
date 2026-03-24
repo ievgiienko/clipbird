@@ -42,11 +42,17 @@ public class AppProperties {
     public static class CleanupProps {
         private int intervalSeconds = 300;
         private int transferTimeoutSeconds = 600;
+        private boolean hardDeleteEnabled = true;
+        private int hardDeleteDelayHours = 168; // 7 days
 
         public int getIntervalSeconds() { return intervalSeconds; }
         public void setIntervalSeconds(int intervalSeconds) { this.intervalSeconds = intervalSeconds; }
         public int getTransferTimeoutSeconds() { return transferTimeoutSeconds; }
         public void setTransferTimeoutSeconds(int transferTimeoutSeconds) { this.transferTimeoutSeconds = transferTimeoutSeconds; }
+        public boolean isHardDeleteEnabled() { return hardDeleteEnabled; }
+        public void setHardDeleteEnabled(boolean hardDeleteEnabled) { this.hardDeleteEnabled = hardDeleteEnabled; }
+        public int getHardDeleteDelayHours() { return hardDeleteDelayHours; }
+        public void setHardDeleteDelayHours(int hardDeleteDelayHours) { this.hardDeleteDelayHours = hardDeleteDelayHours; }
     }
 
     public static class RateLimitProps {
