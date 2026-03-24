@@ -335,7 +335,7 @@ function placeFormatInfo(matrix, mask) {
     ];
 
     for (let i = 0; i < 15; i++) {
-        const dark = ((fmt >> i) & 1) === 1;
+        const dark = ((fmt >> (14 - i)) & 1) === 1;
         matrix[posA[i][0]][posA[i][1]] = dark;
         matrix[posB[i][0]][posB[i][1]] = dark;
     }
