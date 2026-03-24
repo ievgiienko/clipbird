@@ -40,6 +40,8 @@ app:
   cleanup:
     interval-seconds: ${CLEANUP_INTERVAL:300}
     transfer-timeout-seconds: ${TRANSFER_TIMEOUT:600}
+    hard-delete-enabled: ${HARD_DELETE_ENABLED:true}
+    hard-delete-delay-hours: ${HARD_DELETE_DELAY_HOURS:168}
   rate-limit:
     max-creates-per-minute: ${RATE_LIMIT_CREATES:10}
     max-opens-per-minute: ${RATE_LIMIT_OPENS:30}

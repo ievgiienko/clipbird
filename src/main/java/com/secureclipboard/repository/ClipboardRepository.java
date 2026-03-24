@@ -25,4 +25,6 @@ public interface ClipboardRepository extends JpaRepository<Clipboard, Long> {
     @Modifying
     @Query("UPDATE Clipboard c SET c.status = :status WHERE c.id = :id")
     void updateStatus(Long id, ClipboardStatus status);
+
+    List<Clipboard> findByStatusInAndExpiresAtBefore(List<ClipboardStatus> statuses, Instant cutoff);
 }
