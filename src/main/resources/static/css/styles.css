@@ -277,6 +277,144 @@ h2 {
     line-height: 1.6;
 }
 
+/* --- Install CTA --- */
+
+.install-section {
+    margin-bottom: 2rem;
+}
+
+.install-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.08), rgba(79, 195, 247, 0.06));
+    border: 1px solid rgba(33, 150, 243, 0.25);
+    border-radius: var(--radius-lg);
+}
+
+.install-icon {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #2196F3, #4FC3F7);
+    border-radius: 10px;
+    color: white;
+}
+
+.install-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.install-title {
+    display: block;
+    font-size: 1rem;
+    color: var(--text);
+    margin-bottom: 0.15rem;
+}
+
+.install-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.btn-install {
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    color: white;
+    padding: 0.6rem 1.25rem;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+    white-space: nowrap;
+}
+
+.btn-install:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.btn-install:disabled {
+    opacity: 0.6;
+    cursor: default;
+    transform: none;
+}
+
+.btn-install.installed {
+    background: var(--success);
+}
+
+/* iOS install modal */
+
+.ios-install-lead {
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+    color: var(--text);
+}
+
+.ios-install-steps {
+    list-style: none;
+    counter-reset: ios-step;
+    padding: 0;
+    margin: 0 0 1.25rem;
+}
+
+.ios-install-steps li {
+    counter-increment: ios-step;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0;
+    font-size: 0.9rem;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+}
+
+.ios-install-steps li:last-child {
+    border-bottom: none;
+}
+
+.ios-install-steps li::before {
+    content: counter(ios-step);
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.ios-share-icon {
+    display: inline-flex;
+    vertical-align: middle;
+    color: var(--primary);
+}
+
+.ios-install-note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+[data-theme="light"] .install-card {
+    background: linear-gradient(135deg, rgba(25, 118, 210, 0.06), rgba(33, 150, 243, 0.04));
+    border-color: rgba(25, 118, 210, 0.2);
+    box-shadow: var(--shadow);
+}
+
 /* --- Cards --- */
 
 .card {
@@ -984,7 +1122,8 @@ textarea,
 .drop-zone,
 .status,
 .error-box,
-.info-box {
+.info-box,
+.install-card {
     transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -1034,6 +1173,16 @@ textarea,
     .btn-large {
         width: 100%;
         padding: 0.85rem 1.5rem;
+    }
+
+    .install-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.75rem;
+    }
+
+    .btn-install {
+        width: 100%;
     }
 
     .hero-actions {
