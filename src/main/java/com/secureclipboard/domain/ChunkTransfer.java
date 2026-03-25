@@ -34,14 +34,11 @@ public class ChunkTransfer {
     @Column(name = "total_chunks", nullable = false)
     private int totalChunks;
 
-    @Column(name = "pipeline_depth", nullable = false)
-    private int pipelineDepth = 1;
-
     @Column(nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
     private TransferStatus status = TransferStatus.PENDING;
 
-    // --- Double-buffer: slot A ---
+    // --- Single temp chunk slot ---
     @Lob
     @Column(name = "temp_chunk_data", columnDefinition = "LONGBLOB")
     private byte[] tempChunkData;
@@ -51,17 +48,6 @@ public class ChunkTransfer {
 
     @Column(name = "temp_chunk_no")
     private Integer tempChunkNo;
-
-    // --- Double-buffer: slot B ---
-    @Lob
-    @Column(name = "temp_chunk_data_b", columnDefinition = "LONGBLOB")
-    private byte[] tempChunkDataB;
-
-    @Column(name = "temp_chunk_iv_b", length = 64)
-    private String tempChunkIvB;
-
-    @Column(name = "temp_chunk_no_b")
-    private Integer tempChunkNoB;
 
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
@@ -98,9 +84,6 @@ public class ChunkTransfer {
     public int getTotalChunks() { return totalChunks; }
     public void setTotalChunks(int totalChunks) { this.totalChunks = totalChunks; }
 
-    public int getPipelineDepth() { return pipelineDepth; }
-    public void setPipelineDepth(int pipelineDepth) { this.pipelineDepth = pipelineDepth; }
-
     public TransferStatus getStatus() { return status; }
     public void setStatus(TransferStatus status) { this.status = status; }
 
@@ -112,15 +95,6 @@ public class ChunkTransfer {
 
     public Integer getTempChunkNo() { return tempChunkNo; }
     public void setTempChunkNo(Integer tempChunkNo) { this.tempChunkNo = tempChunkNo; }
-
-    public byte[] getTempChunkDataB() { return tempChunkDataB; }
-    public void setTempChunkDataB(byte[] tempChunkDataB) { this.tempChunkDataB = tempChunkDataB; }
-
-    public String getTempChunkIvB() { return tempChunkIvB; }
-    public void setTempChunkIvB(String tempChunkIvB) { this.tempChunkIvB = tempChunkIvB; }
-
-    public Integer getTempChunkNoB() { return tempChunkNoB; }
-    public void setTempChunkNoB(Integer tempChunkNoB) { this.tempChunkNoB = tempChunkNoB; }
 
     public Instant getExpiresAt() { return expiresAt; }
     public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }

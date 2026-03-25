@@ -78,7 +78,7 @@ class TransferServiceTest {
     }
 
     @Test
-    void shouldCreateTransferWithPipelineDepth() {
+    void shouldCreateTransfer() {
         TransferResponse resp = transferService.createTransfer(
             new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
 
@@ -86,7 +86,6 @@ class TransferServiceTest {
         assertEquals(3, resp.totalChunks());
         assertEquals(0, resp.currentChunkNo());
         assertEquals("AWAITING_CHUNK", resp.status());
-        assertEquals(2, resp.pipelineDepth());
         assertTrue(resp.defaultChunkSize() > 0);
         assertTrue(resp.minChunkSize() > 0);
         assertTrue(resp.maxChunkSize() > 0);
@@ -108,34 +107,15 @@ class TransferServiceTest {
     }
 
     @Test
-    void shouldUploadTwoChunksIntoDoubleBuffer() {
-        TransferResponse transfer = transferService.createTransfer(
-            new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
-
-        // Upload chunk 0 into slot A
-        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0");
-        // Upload chunk 1 into slot B
-        transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1");
-
-        // Both should be downloadable
-        ChunkDownloadResponse c0 = transferService.downloadChunk(transfer.transferCode(), 0);
-        assertArrayEquals(new byte[]{10}, c0.data());
-
-        ChunkDownloadResponse c1 = transferService.downloadChunk(transfer.transferCode(), 1);
-        assertArrayEquals(new byte[]{20}, c1.data());
-    }
-
-    @Test
-    void shouldRejectUploadWhenBothSlotsFull() {
+    void shouldRejectUploadWhenSlotFull() {
         TransferResponse transfer = transferService.createTransfer(
             new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
 
         transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0");
-        transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1");
 
-        // Third upload should fail — both slots full
+        // Second upload should fail — slot is full
         assertThrows(IllegalStateException.class, () ->
-            transferService.uploadChunk(transfer.transferCode(), 2, new byte[]{30}, "iv-2"));
+            transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1"));
     }
 
     @Test
@@ -144,19 +124,14 @@ class TransferServiceTest {
             new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
 
         transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0");
-        transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1");
 
-        // ACK clears the lowest chunk (chunk 0)
+        // ACK chunk 0
         TransferResponse afterAck = transferService.acknowledgeChunk(transfer.transferCode());
-        assertEquals(1, afterAck.currentChunkNo()); // next to download is chunk 1
-        assertEquals("CHUNK_READY", afterAck.status()); // chunk 1 still buffered
+        assertEquals(1, afterAck.currentChunkNo());
+        assertEquals("AWAITING_CHUNK", afterAck.status());
 
-        // Chunk 1 should still be downloadable
-        ChunkDownloadResponse c1 = transferService.downloadChunk(transfer.transferCode(), 1);
-        assertArrayEquals(new byte[]{20}, c1.data());
-
-        // Now we can upload chunk 2 (slot freed by ack)
-        transferService.uploadChunk(transfer.transferCode(), 2, new byte[]{30}, "iv-2");
+        // Now we can upload chunk 1 (slot freed by ack)
+        transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1");
     }
 
     @Test
@@ -164,7 +139,7 @@ class TransferServiceTest {
         TransferResponse transfer = transferService.createTransfer(
             new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
 
-        // Upload and ack all 3 chunks
+        // Upload and ack all 3 chunks sequentially
         transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0");
         TransferResponse r1 = transferService.acknowledgeChunk(transfer.transferCode());
         assertEquals("AWAITING_CHUNK", r1.status());
@@ -180,43 +155,20 @@ class TransferServiceTest {
     }
 
     @Test
-    void shouldCompletePipelinedTransfer() {
-        TransferResponse transfer = transferService.createTransfer(
-            new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
-
-        // Pipeline: upload chunks 0 and 1 simultaneously
-        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0");
-        transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1");
-
-        // Ack chunk 0, upload chunk 2 into the freed slot
-        transferService.acknowledgeChunk(transfer.transferCode());
-        transferService.uploadChunk(transfer.transferCode(), 2, new byte[]{30}, "iv-2");
-
-        // Ack chunk 1
-        TransferResponse r2 = transferService.acknowledgeChunk(transfer.transferCode());
-        assertEquals("CHUNK_READY", r2.status()); // chunk 2 still buffered
-
-        // Ack chunk 2 → completed
-        TransferResponse r3 = transferService.acknowledgeChunk(transfer.transferCode());
-        assertEquals("COMPLETED", r3.status());
-    }
-
-    @Test
-    void shouldCancelTransferAndClearBothSlots() {
+    void shouldCancelTransferAndClearSlot() {
         TransferResponse transfer = transferService.createTransfer(
             new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
 
         transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0");
-        transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1");
 
         transferService.cancelTransfer(transfer.transferCode());
 
         TransferResponse cancelled = transferService.getTransfer(transfer.transferCode());
         assertEquals("CANCELLED", cancelled.status());
 
-        // Verify data is cleared by checking uploads fail
+        // Verify data is cleared by checking uploads fail (transfer is cancelled)
         assertThrows(IllegalStateException.class, () ->
-            transferService.uploadChunk(transfer.transferCode(), 2, new byte[]{30}, "iv-2"));
+            transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1"));
     }
 
     @Test
@@ -271,5 +223,40 @@ class TransferServiceTest {
         assertThrows(IllegalStateException.class, () ->
             transferService.createTransfer(
                 new CreateTransferRequest(clipboardCode, fileCode, "target-device")));
+    }
+
+    @Test
+    void shouldRejectDownloadWhenNoChunkReady() {
+        TransferResponse transfer = transferService.createTransfer(
+            new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+
+        // No chunk uploaded yet
+        assertThrows(IllegalStateException.class, () ->
+            transferService.downloadChunk(transfer.transferCode(), 0));
+    }
+
+    @Test
+    void shouldSequentiallyTransferAllChunks() {
+        TransferResponse transfer = transferService.createTransfer(
+            new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+
+        // Simulate full sequential transfer: upload -> download -> ack for each chunk
+        for (int i = 0; i < 3; i++) {
+            byte[] data = new byte[]{(byte) (i * 10)};
+            transferService.uploadChunk(transfer.transferCode(), i, data, "iv-" + i);
+
+            ChunkDownloadResponse chunk = transferService.downloadChunk(transfer.transferCode(), i);
+            assertArrayEquals(data, chunk.data());
+            assertEquals(i == 2, chunk.lastChunk());
+
+            TransferResponse afterAck = transferService.acknowledgeChunk(transfer.transferCode());
+            assertEquals(i + 1, afterAck.currentChunkNo());
+
+            if (i < 2) {
+                assertEquals("AWAITING_CHUNK", afterAck.status());
+            } else {
+                assertEquals("COMPLETED", afterAck.status());
+            }
+        }
     }
 }

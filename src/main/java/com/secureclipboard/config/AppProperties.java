@@ -28,7 +28,6 @@ public class AppProperties {
         private int chunkSizeBytes = 5_242_880;
         private int minChunkSizeBytes = 262_144;       // 256 KB
         private int maxChunkSizeBytes = 10_485_760;     // 10 MB
-        private int pipelineDepth = 2;
 
         public int getIdLength() { return idLength; }
         public void setIdLength(int idLength) { this.idLength = idLength; }
@@ -44,8 +43,6 @@ public class AppProperties {
         public void setMinChunkSizeBytes(int minChunkSizeBytes) { this.minChunkSizeBytes = minChunkSizeBytes; }
         public int getMaxChunkSizeBytes() { return maxChunkSizeBytes; }
         public void setMaxChunkSizeBytes(int maxChunkSizeBytes) { this.maxChunkSizeBytes = maxChunkSizeBytes; }
-        public int getPipelineDepth() { return pipelineDepth; }
-        public void setPipelineDepth(int pipelineDepth) { this.pipelineDepth = pipelineDepth; }
     }
 
     public static class CleanupProps {

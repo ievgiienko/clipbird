@@ -185,7 +185,7 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
 
     /**
      * Target device requests a chunk from the source.
-     * The message now includes chunkSize so the source knows how to slice the file.
+     * Includes chunkSize so the source knows how to slice the file.
      */
     private void handleTransferRequest(WebSocketSession session, JsonNode payload) throws IOException {
         String clipboardCode = sessionManager.getClipboardCode(session);
@@ -237,7 +237,7 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
      * Target device acknowledges a downloaded chunk.
      * The server clears the buffer slot and determines next actions:
      * - If transfer completed, notify both devices.
-     * - If more chunks needed, request them from source (pipeline-aware).
+     * - If more chunks needed, request the next one from source.
      */
     private void handleChunkAck(WebSocketSession session, JsonNode payload) throws IOException {
         String transferCode = payload.path("transferCode").asText();
@@ -255,48 +255,20 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
             broadcastToDevices(clipboardCode, msg.toString(),
                 transferResp.sourceDeviceId(), transferResp.targetDeviceId());
         } else {
-            // Determine how many new chunks the source should upload to fill the pipeline.
-            // currentChunkNo = next chunk target expects to download.
-            // We need to figure out the highest chunk already requested/buffered
-            // and request up to pipelineDepth ahead.
-            int nextToDownload = transferResp.currentChunkNo();
-            int totalChunks = transferResp.totalChunks();
-            int pipelineDepth = transferResp.pipelineDepth();
-
-            // The highest chunk that should be in-flight or buffered
-            int highestNeeded = Math.min(nextToDownload + pipelineDepth - 1, totalChunks - 1);
-
-            // We know the ack freed a slot. The server may still have one chunk buffered.
-            // We request chunks for any empty pipeline slots beyond what's buffered.
-            // For simplicity, request the next chunk that isn't already buffered.
-            // The chunk_ack payload tells us what the target already has queued.
-            WebSocketSession sourceSession = sessionManager.getSession(clipboardCode, transferResp.sourceDeviceId());
-            if (sourceSession != null && sourceSession.isOpen()) {
-                // Request chunk at currentChunkNo + (pipelineDepth - 1) if not yet requested.
-                // Since we just acked one, we have at most 1 buffered. Request one more.
-                int chunkToRequest = highestNeeded;
-                if (chunkToRequest < totalChunks) {
+            // Request the next chunk from the source
+            int nextChunk = transferResp.currentChunkNo();
+            if (nextChunk < transferResp.totalChunks()) {
+                WebSocketSession sourceSession = sessionManager.getSession(clipboardCode, transferResp.sourceDeviceId());
+                if (sourceSession != null && sourceSession.isOpen()) {
                     ObjectNode msg = objectMapper.createObjectNode();
                     msg.put("type", "send_chunk");
                     msg.put("transferCode", transferCode);
                     msg.put("fileCode", transferResp.fileCode());
-                    msg.put("chunkNo", chunkToRequest);
+                    msg.put("chunkNo", nextChunk);
                     if (chunkSize > 0) {
                         msg.put("chunkSize", chunkSize);
                     }
                     sendMessage(sourceSession, msg.toString());
-                }
-            }
-
-            // If there's already a buffered chunk ready, also notify target
-            if ("CHUNK_READY".equals(transferResp.status())) {
-                WebSocketSession targetSession = sessionManager.getSession(clipboardCode, transferResp.targetDeviceId());
-                if (targetSession != null && targetSession.isOpen()) {
-                    ObjectNode readyMsg = objectMapper.createObjectNode();
-                    readyMsg.put("type", "chunk_ready");
-                    readyMsg.put("transferCode", transferCode);
-                    readyMsg.put("chunkNo", nextToDownload);
-                    sendMessage(targetSession, readyMsg.toString());
                 }
             }
         }

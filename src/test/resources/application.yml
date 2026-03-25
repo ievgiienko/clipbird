@@ -22,7 +22,6 @@ app:
     chunk-size-bytes: 5242880
     min-chunk-size-bytes: 262144
     max-chunk-size-bytes: 10485760
-    pipeline-depth: 2
   cleanup:
     interval-seconds: 3600
     transfer-timeout-seconds: 600
