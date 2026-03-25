@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.secureclipboard.dto.TextSnapshotDto;
+import com.secureclipboard.dto.TransferResponse;
 import com.secureclipboard.service.ClipboardService;
 import com.secureclipboard.service.DeviceSessionManager;
 import com.secureclipboard.service.TransferService;
@@ -106,7 +107,6 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
 
         sessionManager.join(clipboardCode, deviceId, session);
 
-        // Send join confirmation
         ObjectNode joinConfirm = objectMapper.createObjectNode();
         joinConfirm.put("type", "joined");
         joinConfirm.put("clipboardCode", clipboardCode);
@@ -114,7 +114,6 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
         joinConfirm.put("connectedDevices", sessionManager.getConnectedCount(clipboardCode));
         sendMessage(session, joinConfirm.toString());
 
-        // Notify others
         broadcastToRoom(clipboardCode, createDeviceEvent("device_joined", deviceId, clipboardCode), session);
     }
 
@@ -143,7 +142,6 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
         byte[] ciphertext = Base64.getDecoder().decode(ciphertextB64);
         TextSnapshotDto updated = clipboardService.updateText(clipboardCode, ciphertext, iv, expectedVersion, deviceId);
 
-        // Broadcast to all including sender (for version confirmation)
         ObjectNode msg = objectMapper.createObjectNode();
         msg.put("type", "text_updated");
         msg.put("ciphertext", updated.ciphertext());
@@ -157,7 +155,6 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
         String clipboardCode = sessionManager.getClipboardCode(session);
         if (clipboardCode == null) return;
 
-        // Broadcast file manifest to all other devices
         ObjectNode msg = objectMapper.createObjectNode();
         msg.put("type", "file_added");
         msg.set("file", payload.path("file"));
@@ -178,7 +175,6 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
         String clipboardCode = sessionManager.getClipboardCode(session);
         if (clipboardCode == null) return;
 
-        // Broadcast before deleting — deleteClipboard removes the session room
         ObjectNode msg = objectMapper.createObjectNode();
         msg.put("type", "clipboard_deleted");
         msg.put("clipboardCode", clipboardCode);
@@ -187,6 +183,10 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
         clipboardService.deleteClipboard(clipboardCode);
     }
 
+    /**
+     * Target device requests a chunk from the source.
+     * The message now includes chunkSize so the source knows how to slice the file.
+     */
     private void handleTransferRequest(WebSocketSession session, JsonNode payload) throws IOException {
         String clipboardCode = sessionManager.getClipboardCode(session);
         if (clipboardCode == null) return;
@@ -195,8 +195,8 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
         String fileCode = payload.path("fileCode").asText();
         String sourceDeviceId = payload.path("sourceDeviceId").asText();
         int chunkNo = payload.path("chunkNo").asInt(0);
+        int chunkSize = payload.path("chunkSize").asInt(0);
 
-        // Notify source device to send chunk
         WebSocketSession sourceSession = sessionManager.getSession(clipboardCode, sourceDeviceId);
         if (sourceSession != null && sourceSession.isOpen()) {
             ObjectNode msg = objectMapper.createObjectNode();
@@ -204,19 +204,25 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
             msg.put("transferCode", transferCode);
             msg.put("fileCode", fileCode);
             msg.put("chunkNo", chunkNo);
+            if (chunkSize > 0) {
+                msg.put("chunkSize", chunkSize);
+            }
             sendMessage(sourceSession, msg.toString());
         } else {
             sendError(session, "Source device is offline");
         }
     }
 
+    /**
+     * Source device signals that a chunk has been uploaded to the server.
+     * Notify the target device.
+     */
     private void handleChunkUploaded(WebSocketSession session, JsonNode payload) throws IOException {
         String transferCode = payload.path("transferCode").asText();
         String targetDeviceId = payload.path("targetDeviceId").asText();
         String clipboardCode = sessionManager.getClipboardCode(session);
         if (clipboardCode == null) return;
 
-        // Notify target that chunk is ready
         WebSocketSession targetSession = sessionManager.getSession(clipboardCode, targetDeviceId);
         if (targetSession != null && targetSession.isOpen()) {
             ObjectNode msg = objectMapper.createObjectNode();
@@ -227,31 +233,71 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    /**
+     * Target device acknowledges a downloaded chunk.
+     * The server clears the buffer slot and determines next actions:
+     * - If transfer completed, notify both devices.
+     * - If more chunks needed, request them from source (pipeline-aware).
+     */
     private void handleChunkAck(WebSocketSession session, JsonNode payload) throws IOException {
         String transferCode = payload.path("transferCode").asText();
-        var transferResp = transferService.acknowledgeChunk(transferCode);
+        int chunkSize = payload.path("chunkSize").asInt(0);
+        TransferResponse transferResp = transferService.acknowledgeChunk(transferCode);
 
         String clipboardCode = sessionManager.getClipboardCode(session);
         if (clipboardCode == null) return;
 
         if ("COMPLETED".equals(transferResp.status())) {
-            // Notify both devices
             ObjectNode msg = objectMapper.createObjectNode();
             msg.put("type", "transfer_complete");
             msg.put("transferCode", transferCode);
             msg.put("fileCode", transferResp.fileCode());
             broadcastToDevices(clipboardCode, msg.toString(),
                 transferResp.sourceDeviceId(), transferResp.targetDeviceId());
-        } else if ("AWAITING_CHUNK".equals(transferResp.status())) {
-            // Request next chunk from source
+        } else {
+            // Determine how many new chunks the source should upload to fill the pipeline.
+            // currentChunkNo = next chunk target expects to download.
+            // We need to figure out the highest chunk already requested/buffered
+            // and request up to pipelineDepth ahead.
+            int nextToDownload = transferResp.currentChunkNo();
+            int totalChunks = transferResp.totalChunks();
+            int pipelineDepth = transferResp.pipelineDepth();
+
+            // The highest chunk that should be in-flight or buffered
+            int highestNeeded = Math.min(nextToDownload + pipelineDepth - 1, totalChunks - 1);
+
+            // We know the ack freed a slot. The server may still have one chunk buffered.
+            // We request chunks for any empty pipeline slots beyond what's buffered.
+            // For simplicity, request the next chunk that isn't already buffered.
+            // The chunk_ack payload tells us what the target already has queued.
             WebSocketSession sourceSession = sessionManager.getSession(clipboardCode, transferResp.sourceDeviceId());
             if (sourceSession != null && sourceSession.isOpen()) {
-                ObjectNode msg = objectMapper.createObjectNode();
-                msg.put("type", "send_chunk");
-                msg.put("transferCode", transferCode);
-                msg.put("fileCode", transferResp.fileCode());
-                msg.put("chunkNo", transferResp.currentChunkNo());
-                sendMessage(sourceSession, msg.toString());
+                // Request chunk at currentChunkNo + (pipelineDepth - 1) if not yet requested.
+                // Since we just acked one, we have at most 1 buffered. Request one more.
+                int chunkToRequest = highestNeeded;
+                if (chunkToRequest < totalChunks) {
+                    ObjectNode msg = objectMapper.createObjectNode();
+                    msg.put("type", "send_chunk");
+                    msg.put("transferCode", transferCode);
+                    msg.put("fileCode", transferResp.fileCode());
+                    msg.put("chunkNo", chunkToRequest);
+                    if (chunkSize > 0) {
+                        msg.put("chunkSize", chunkSize);
+                    }
+                    sendMessage(sourceSession, msg.toString());
+                }
+            }
+
+            // If there's already a buffered chunk ready, also notify target
+            if ("CHUNK_READY".equals(transferResp.status())) {
+                WebSocketSession targetSession = sessionManager.getSession(clipboardCode, transferResp.targetDeviceId());
+                if (targetSession != null && targetSession.isOpen()) {
+                    ObjectNode readyMsg = objectMapper.createObjectNode();
+                    readyMsg.put("type", "chunk_ready");
+                    readyMsg.put("transferCode", transferCode);
+                    readyMsg.put("chunkNo", nextToDownload);
+                    sendMessage(targetSession, readyMsg.toString());
+                }
             }
         }
     }

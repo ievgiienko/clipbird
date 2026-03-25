@@ -37,6 +37,9 @@ app:
     max-text-size-bytes: ${MAX_TEXT_SIZE:10485760}
     max-file-size-bytes: ${MAX_FILE_SIZE:524288000}
     chunk-size-bytes: ${CHUNK_SIZE:5242880}
+    min-chunk-size-bytes: ${MIN_CHUNK_SIZE:262144}
+    max-chunk-size-bytes: ${MAX_CHUNK_SIZE:10485760}
+    pipeline-depth: ${PIPELINE_DEPTH:2}
   cleanup:
     interval-seconds: ${CLEANUP_INTERVAL:300}
     transfer-timeout-seconds: ${TRANSFER_TIMEOUT:600}

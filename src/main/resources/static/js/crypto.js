@@ -106,6 +106,7 @@ export async function decryptText(key, ciphertextB64, ivB64) {
 /**
  * Encrypt a binary chunk with AES-GCM.
  * Returns { data: base64, iv: base64 }
+ * @deprecated Use encryptChunkBinary for binary transport.
  */
 export async function encryptChunk(key, chunk) {
     const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
@@ -124,11 +125,44 @@ export async function encryptChunk(key, chunk) {
 
 /**
  * Decrypt a binary chunk with AES-GCM.
+ * @deprecated Use decryptChunkBinary for binary transport.
  */
 export async function decryptChunk(key, dataB64, ivB64) {
     const data = base64ToBytes(dataB64);
     const iv = base64ToBytes(ivB64);
 
+    return crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        data
+    );
+}
+
+/**
+ * Encrypt a binary chunk with AES-GCM.
+ * Returns { data: ArrayBuffer (encrypted bytes), iv: Uint8Array (raw 12 bytes) }
+ * No base64 encoding — suitable for binary transport.
+ */
+export async function encryptChunkBinary(key, chunk) {
+    const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+
+    const ciphertext = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        chunk
+    );
+
+    return { data: ciphertext, iv };
+}
+
+/**
+ * Decrypt a binary chunk with AES-GCM using raw bytes.
+ * @param {CryptoKey} key
+ * @param {ArrayBuffer} data - raw encrypted bytes
+ * @param {Uint8Array} iv - raw 12-byte IV
+ * @returns {Promise<ArrayBuffer>}
+ */
+export async function decryptChunkBinary(key, data, iv) {
     return crypto.subtle.decrypt(
         { name: 'AES-GCM', iv },
         key,

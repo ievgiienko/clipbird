@@ -1,6 +1,11 @@
 /**
  * Main application entry point.
  * Orchestrates all modules: crypto, api, ws, file-store, state, ui, router, qr.
+ *
+ * File transfer performance features:
+ * - Pipelined (double-buffered) transfers: chunk N+1 uploads while chunk N downloads
+ * - Adaptive chunk sizing: measures throughput on first chunk, adjusts for remaining
+ * - Binary transport: encrypted chunks sent as raw bytes, not base64 JSON
  */
 
 import * as crypto from './crypto.js';
@@ -15,8 +20,13 @@ import * as passwordStrength from './password-strength.js';
 import { initTheme } from './theme.js';
 import { initPwa } from './pwa.js';
 
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB default
 const TEXT_DEBOUNCE_MS = 500;
+
+// Adaptive chunk size constants
+const MIN_CHUNK_SIZE = 256 * 1024;      // 256 KB
+const MAX_CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB
+const ADAPTIVE_WARMUP_CHUNKS = 1;        // Measure first N chunks before adapting
 
 let ws = null;
 
@@ -622,8 +632,50 @@ async function removeFile(fileCode) {
     }
 }
 
-// --- File download (target device) ---
+// ============================================================
+// ADAPTIVE CHUNK SIZE
+// ============================================================
 
+/**
+ * Compute an optimal chunk size based on measured throughput.
+ *
+ * Algorithm:
+ * 1. Measure round-trip time for the first chunk (upload + relay + download).
+ * 2. Calculate effective throughput in bytes/second.
+ * 3. Target a chunk transfer time of ~2 seconds for good responsiveness.
+ * 4. Clamp to [minChunkSize, maxChunkSize].
+ * 5. Round down to nearest 256 KB for clean alignment.
+ *
+ * @param {number} bytesTransferred - bytes in the measured chunk
+ * @param {number} elapsedMs - wall-clock time for that chunk's full cycle
+ * @param {number} minSize - minimum chunk size
+ * @param {number} maxSize - maximum chunk size
+ * @returns {number} optimal chunk size in bytes
+ */
+function computeAdaptiveChunkSize(bytesTransferred, elapsedMs, minSize, maxSize) {
+    if (elapsedMs <= 0) return CHUNK_SIZE;
+
+    const throughputBps = (bytesTransferred / elapsedMs) * 1000;
+    // Target: each chunk should take ~2 seconds to transfer
+    const TARGET_CHUNK_DURATION_S = 2;
+    let optimal = Math.floor(throughputBps * TARGET_CHUNK_DURATION_S);
+
+    // Round down to 256 KB boundary
+    const ALIGNMENT = 256 * 1024;
+    optimal = Math.floor(optimal / ALIGNMENT) * ALIGNMENT;
+
+    return Math.max(minSize, Math.min(maxSize, optimal || minSize));
+}
+
+// ============================================================
+// FILE DOWNLOAD (TARGET DEVICE) — PIPELINED
+// ============================================================
+
+/**
+ * Start downloading a file.
+ * The transfer response includes pipelineDepth and chunk size config.
+ * We request initial chunks to fill the pipeline window.
+ */
 async function startDownload(fileCode) {
     const state = getState();
     const file = state.files.find(f => f.fileCode === fileCode);
@@ -643,34 +695,71 @@ async function startDownload(fileCode) {
             direction: 'download',
             currentChunk: 0,
             chunks: [],
+            // Adaptive chunk size state
+            chunkSize: transfer.defaultChunkSize || CHUNK_SIZE,
+            minChunkSize: transfer.minChunkSize || MIN_CHUNK_SIZE,
+            maxChunkSize: transfer.maxChunkSize || MAX_CHUNK_SIZE,
+            adaptiveResolved: false,
+            chunkTimings: [],           // { bytes, elapsedMs } for warmup measurement
+            // Pipeline state
+            pipelineDepth: transfer.pipelineDepth || 1,
+            highestRequested: -1,       // highest chunkNo we've requested from source
+            pendingDownloads: new Set(), // chunkNos for which chunk_ready received but not yet downloaded
         });
         ui.renderTransfers(state.activeTransfers);
 
-        ws.send({
-            type: 'transfer_request',
-            transferCode: transfer.transferCode,
-            fileCode,
-            sourceDeviceId: file.sourceDeviceId,
-            chunkNo: 0
-        });
+        // Request initial pipeline window of chunks
+        const t = state.activeTransfers.get(transfer.transferCode);
+        const chunksToRequest = Math.min(t.pipelineDepth, t.totalChunks);
+        for (let i = 0; i < chunksToRequest; i++) {
+            requestChunkFromSource(transfer.transferCode, fileCode, file.sourceDeviceId, i, t.chunkSize);
+            t.highestRequested = i;
+        }
+        // Record start time for first chunk
+        t._chunkStartTime = performance.now();
     } catch (err) {
         ui.showError('clipboard-error', 'Failed to start download: ' + err.message);
     }
 }
 
-// --- File upload (source device) ---
+/**
+ * Send a WebSocket message requesting the source device to upload a chunk.
+ */
+function requestChunkFromSource(transferCode, fileCode, sourceDeviceId, chunkNo, chunkSize) {
+    ws.send({
+        type: 'transfer_request',
+        transferCode,
+        fileCode,
+        sourceDeviceId,
+        chunkNo,
+        chunkSize
+    });
+}
 
+// ============================================================
+// FILE UPLOAD (SOURCE DEVICE)
+// ============================================================
+
+/**
+ * Handle server's request to upload a specific chunk.
+ * Uses binary encryption (no base64) and binary upload.
+ * The chunkSize may vary per-chunk due to adaptive sizing.
+ */
 async function handleSendChunkRequest(msg) {
     const state = getState();
     const { transferCode, fileCode, chunkNo } = msg;
 
     try {
         const file = state.files.find(f => f.fileCode === fileCode);
-        const chunkSize = file ? file.chunkSize : CHUNK_SIZE;
+        // Use the chunk size from the message (adaptive) or fall back to file/default
+        const chunkSize = msg.chunkSize || (file ? file.chunkSize : CHUNK_SIZE);
         const chunkData = await fileStore.readChunk(fileCode, chunkNo, chunkSize);
 
-        const encrypted = await crypto.encryptChunk(state.cryptoKey, chunkData);
-        await api.uploadChunk(transferCode, chunkNo, encrypted.data, encrypted.iv);
+        // Binary encryption: returns { data: ArrayBuffer, iv: Uint8Array }
+        const encrypted = await crypto.encryptChunkBinary(state.cryptoKey, chunkData);
+        // IV as base64 string for the header/form field
+        const ivB64 = crypto.bytesToBase64(encrypted.iv);
+        await api.uploadChunk(transferCode, chunkNo, encrypted.data, ivB64);
 
         const transfer = await api.getTransfer(transferCode);
 
@@ -686,31 +775,80 @@ async function handleSendChunkRequest(msg) {
     }
 }
 
-// --- Chunk ready (target device) ---
+// ============================================================
+// CHUNK READY (TARGET DEVICE) — PIPELINED
+// ============================================================
 
+/**
+ * Handle notification that a chunk is ready on the server.
+ * Download it, decrypt it, store it, and ACK.
+ * Pipeline-aware: may process multiple chunks concurrently up to pipelineDepth.
+ */
 async function handleChunkReady(msg) {
     const state = getState();
     const { transferCode, chunkNo } = msg;
     const transfer = state.activeTransfers.get(transferCode);
     if (!transfer) return;
 
+    // Guard against duplicate chunk_ready for same chunkNo
+    if (transfer.pendingDownloads.has(chunkNo) || transfer.chunks[chunkNo]) return;
+    transfer.pendingDownloads.add(chunkNo);
+
     try {
+        // Binary download: returns { data: ArrayBuffer, iv: string (base64), lastChunk, chunkNo }
         const chunk = await api.downloadChunk(transferCode, chunkNo);
-        const decrypted = await crypto.decryptChunk(state.cryptoKey, chunk.data, chunk.iv);
-        transfer.chunks.push(new Uint8Array(decrypted));
-        transfer.currentChunk = chunkNo + 1;
-        transfer.status = `${chunkNo + 1}/${transfer.totalChunks}`;
+        // Decrypt using binary path: convert IV from base64 to Uint8Array
+        const ivBytes = crypto.base64ToBytes(chunk.iv);
+        const decrypted = await crypto.decryptChunkBinary(state.cryptoKey, chunk.data, ivBytes);
+        transfer.chunks[chunkNo] = new Uint8Array(decrypted);
+
+        // Update progress: count filled chunk slots
+        const completedChunks = transfer.chunks.filter(c => c != null).length;
+        transfer.currentChunk = completedChunks;
+        transfer.status = `${completedChunks}/${transfer.totalChunks}`;
         ui.renderTransfers(state.activeTransfers);
 
-        ws.send({ type: 'chunk_ack', transferCode });
+        // Measure timing for adaptive chunk sizing
+        if (!transfer.adaptiveResolved && transfer._chunkStartTime) {
+            const elapsed = performance.now() - transfer._chunkStartTime;
+            transfer.chunkTimings.push({
+                bytes: chunk.data.byteLength,
+                elapsedMs: elapsed
+            });
+
+            if (transfer.chunkTimings.length >= ADAPTIVE_WARMUP_CHUNKS) {
+                // Calculate average throughput across warmup chunks
+                const totalBytes = transfer.chunkTimings.reduce((s, t) => s + t.bytes, 0);
+                const totalMs = transfer.chunkTimings.reduce((s, t) => s + t.elapsedMs, 0);
+                const newSize = computeAdaptiveChunkSize(
+                    totalBytes, totalMs,
+                    transfer.minChunkSize, transfer.maxChunkSize
+                );
+                if (newSize !== transfer.chunkSize) {
+                    console.log(`Adaptive chunk size: ${transfer.chunkSize} -> ${newSize} bytes ` +
+                        `(${Math.round(totalBytes / totalMs * 1000 / 1024)} KB/s)`);
+                    transfer.chunkSize = newSize;
+                }
+                transfer.adaptiveResolved = true;
+            }
+        }
+        // Reset timer for next chunk
+        transfer._chunkStartTime = performance.now();
+
+        // ACK this chunk. Include current chunkSize so server can pass it to source.
+        ws.send({ type: 'chunk_ack', transferCode, chunkSize: transfer.chunkSize });
     } catch (err) {
         console.error('Failed to download chunk:', err);
         transfer.status = 'Error: ' + err.message;
         ui.renderTransfers(state.activeTransfers);
+    } finally {
+        transfer.pendingDownloads.delete(chunkNo);
     }
 }
 
-// --- Transfer complete ---
+// ============================================================
+// TRANSFER COMPLETE
+// ============================================================
 
 async function handleTransferComplete(msg) {
     const state = getState();
@@ -722,7 +860,16 @@ async function handleTransferComplete(msg) {
     }
 
     try {
-        const blob = new Blob(transfer.chunks);
+        // Reconstruct file from ordered chunks
+        const orderedChunks = [];
+        for (let i = 0; i < transfer.totalChunks; i++) {
+            if (!transfer.chunks[i]) {
+                throw new Error(`Missing chunk ${i}`);
+            }
+            orderedChunks.push(transfer.chunks[i]);
+        }
+
+        const blob = new Blob(orderedChunks);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

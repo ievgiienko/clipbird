@@ -43,7 +43,8 @@
       "Bash(npm install:*)",
       "Bash(node --input-type=module -e \":*)",
       "Bash(cd:*)",
-      "Bash(find /c/Projects/secure-clipboard/src/main/java -name *Controller* -o -name *controller*)"
+      "Bash(find /c/Projects/secure-clipboard/src/main/java -name *Controller* -o -name *controller*)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

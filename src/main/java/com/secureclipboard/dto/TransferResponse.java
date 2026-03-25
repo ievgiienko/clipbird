@@ -7,5 +7,9 @@ public record TransferResponse(
     String targetDeviceId,
     int totalChunks,
     int currentChunkNo,
-    String status
+    String status,
+    int pipelineDepth,
+    int defaultChunkSize,
+    int minChunkSize,
+    int maxChunkSize
 ) {}
