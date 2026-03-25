@@ -8,7 +8,6 @@ public record TransferResponse(
     int totalChunks,
     int currentChunkNo,
     String status,
-    int pipelineDepth,
     int defaultChunkSize,
     int minChunkSize,
     int maxChunkSize

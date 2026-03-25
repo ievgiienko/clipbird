@@ -171,6 +171,39 @@ export function setDropZoneEnabled(enabled) {
     }
 }
 
+// --- Download All button ---
+
+export function renderDownloadAllButton(downloadableCount, batchState) {
+    const container = document.getElementById('download-all-container');
+    if (!container) return;
+
+    if (downloadableCount < 2) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const area = document.createElement('div');
+    area.className = 'download-all-area';
+
+    if (batchState && batchState.active) {
+        const statusText = batchState.failed > 0
+            ? `${batchState.completed} completed, ${batchState.failed} failed`
+            : `Downloading ${batchState.completed + 1} of ${batchState.total}...`;
+        const statusClass = batchState.failed > 0 ? 'download-all-status error' : 'download-all-status';
+        area.innerHTML = `
+            <span class="${statusClass}">${escapeHtml(statusText)}</span>
+            <button class="btn btn-small btn-danger" id="btn-cancel-download-all">Cancel</button>
+        `;
+    } else {
+        area.innerHTML = `
+            <button class="btn btn-small btn-primary" id="btn-download-all">Download All (${downloadableCount})</button>
+        `;
+    }
+
+    container.innerHTML = '';
+    container.appendChild(area);
+}
+
 // --- File list ---
 
 export async function renderFileList(files) {
@@ -197,13 +230,14 @@ export async function renderFileList(files) {
 
         const isOwn = file.sourceDeviceId === state.deviceId;
         const sizeStr = formatBytes(file.sizeBytes);
-        const sourceStatus = file.sourceOnline
-            ? '<span class="file-source-status online">Source online</span>'
-            : '<span class="file-source-status offline">Source offline</span>';
+        const sourceStatus = isOwn ? ''
+            : file.sourceOnline
+                ? '<span class="file-source-status online">Source online</span>'
+                : '<span class="file-source-status offline">Source offline</span>';
 
         el.innerHTML = `
             <div class="file-info">
-                <div class="file-name">${escapeHtml(fileName)}</div>
+                <div class="file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div>
                 <div class="file-meta">
                     <span>${sizeStr}</span>
                     <span>${file.totalChunks} chunk${file.totalChunks !== 1 ? 's' : ''}</span>

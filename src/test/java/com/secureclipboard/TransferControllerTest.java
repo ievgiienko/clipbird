@@ -79,7 +79,7 @@ class TransferControllerTest {
     }
 
     @Test
-    void shouldCreateTransferWithPipelineInfo() throws Exception {
+    void shouldCreateTransferWithChunkSizeInfo() throws Exception {
         String body = objectMapper.writeValueAsString(
             new java.util.HashMap<>() {{
                 put("clipboardCode", clipboardCode);
@@ -87,16 +87,14 @@ class TransferControllerTest {
                 put("targetDeviceId", "target-dev");
             }});
 
-        MvcResult result = mockMvc.perform(post("/api/transfers")
+        mockMvc.perform(post("/api/transfers")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.transferCode").exists())
-            .andExpect(jsonPath("$.pipelineDepth").value(2))
             .andExpect(jsonPath("$.defaultChunkSize").exists())
             .andExpect(jsonPath("$.minChunkSize").exists())
-            .andExpect(jsonPath("$.maxChunkSize").exists())
-            .andReturn();
+            .andExpect(jsonPath("$.maxChunkSize").exists());
     }
 
     @Test

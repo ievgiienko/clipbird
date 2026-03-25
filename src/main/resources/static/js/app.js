@@ -2,8 +2,8 @@
  * Main application entry point.
  * Orchestrates all modules: crypto, api, ws, file-store, state, ui, router, qr.
  *
- * File transfer performance features:
- * - Pipelined (double-buffered) transfers: chunk N+1 uploads while chunk N downloads
+ * File transfer features:
+ * - Sequential transfers: one chunk at a time per transfer
  * - Adaptive chunk sizing: measures throughput on first chunk, adjusts for remaining
  * - Binary transport: encrypted chunks sent as raw bytes, not base64 JSON
  */
@@ -79,6 +79,7 @@ function bindEvents() {
     // Delegate file/transfer action clicks
     document.getElementById('file-list').addEventListener('click', handleFileAction);
     document.getElementById('transfer-list').addEventListener('click', handleTransferAction);
+    document.getElementById('download-all-container').addEventListener('click', handleDownloadAllAction);
 
     // QR modal
     document.getElementById('btn-close-qr').addEventListener('click', ui.hideQrModal);
@@ -395,6 +396,7 @@ async function connectToClipboard(clipboardCode, passwordHash) {
         if (clipState.files && clipState.files.length > 0) {
             setState({ files: clipState.files });
             await ui.renderFileList(clipState.files);
+            updateDownloadAllButton();
         }
     } catch (err) {
         ui.showError('clipboard-error', err.message);
@@ -453,12 +455,14 @@ function setupWsHandlers(ws) {
         const state = getState();
         state.files.push(msg.file);
         await ui.renderFileList(state.files);
+        updateDownloadAllButton();
     });
 
     ws.on('file_removed', (msg) => {
         const state = getState();
         state.files = state.files.filter(f => f.fileCode !== msg.fileCode);
         ui.renderFileList(state.files);
+        updateDownloadAllButton();
     });
 
     ws.on('clipboard_deleted', () => {
@@ -543,6 +547,7 @@ async function processFiles(files) {
 
             state.files.push(manifest);
             await ui.renderFileList(state.files);
+            updateDownloadAllButton();
 
             ws.send({ type: 'file_added', file: manifest });
         } catch (err) {
@@ -626,6 +631,7 @@ async function removeFile(fileCode) {
         await fileStore.removeFile(fileCode);
         state.files = state.files.filter(f => f.fileCode !== fileCode);
         await ui.renderFileList(state.files);
+        updateDownloadAllButton();
         ws.send({ type: 'file_removed', fileCode });
     } catch (err) {
         ui.showError('clipboard-error', 'Failed to remove file: ' + err.message);
@@ -668,13 +674,12 @@ function computeAdaptiveChunkSize(bytesTransferred, elapsedMs, minSize, maxSize)
 }
 
 // ============================================================
-// FILE DOWNLOAD (TARGET DEVICE) — PIPELINED
+// FILE DOWNLOAD (TARGET DEVICE) — SEQUENTIAL
 // ============================================================
 
 /**
  * Start downloading a file.
- * The transfer response includes pipelineDepth and chunk size config.
- * We request initial chunks to fill the pipeline window.
+ * Creates a transfer and requests the first chunk from the source.
  */
 async function startDownload(fileCode) {
     const state = getState();
@@ -700,25 +705,22 @@ async function startDownload(fileCode) {
             minChunkSize: transfer.minChunkSize || MIN_CHUNK_SIZE,
             maxChunkSize: transfer.maxChunkSize || MAX_CHUNK_SIZE,
             adaptiveResolved: false,
-            chunkTimings: [],           // { bytes, elapsedMs } for warmup measurement
-            // Pipeline state
-            pipelineDepth: transfer.pipelineDepth || 1,
-            highestRequested: -1,       // highest chunkNo we've requested from source
-            pendingDownloads: new Set(), // chunkNos for which chunk_ready received but not yet downloaded
+            chunkTimings: [],
         });
         ui.renderTransfers(state.activeTransfers);
+        onBatchTransferStarted(transfer.transferCode);
 
-        // Request initial pipeline window of chunks
-        const t = state.activeTransfers.get(transfer.transferCode);
-        const chunksToRequest = Math.min(t.pipelineDepth, t.totalChunks);
-        for (let i = 0; i < chunksToRequest; i++) {
-            requestChunkFromSource(transfer.transferCode, fileCode, file.sourceDeviceId, i, t.chunkSize);
-            t.highestRequested = i;
-        }
-        // Record start time for first chunk
-        t._chunkStartTime = performance.now();
+        // Request the first chunk from the source
+        requestChunkFromSource(transfer.transferCode, fileCode, file.sourceDeviceId, 0, transfer.defaultChunkSize || CHUNK_SIZE);
+        // Record start time for adaptive sizing measurement
+        state.activeTransfers.get(transfer.transferCode)._chunkStartTime = performance.now();
     } catch (err) {
         ui.showError('clipboard-error', 'Failed to start download: ' + err.message);
+        if (batchDownload && batchDownload.active) {
+            batchDownload.failed++;
+            updateDownloadAllButton();
+            startNextBatchDownload();
+        }
     }
 }
 
@@ -776,13 +778,13 @@ async function handleSendChunkRequest(msg) {
 }
 
 // ============================================================
-// CHUNK READY (TARGET DEVICE) — PIPELINED
+// CHUNK READY (TARGET DEVICE) — SEQUENTIAL
 // ============================================================
 
 /**
  * Handle notification that a chunk is ready on the server.
  * Download it, decrypt it, store it, and ACK.
- * Pipeline-aware: may process multiple chunks concurrently up to pipelineDepth.
+ * Sequential: one chunk at a time, server requests the next chunk after ACK.
  */
 async function handleChunkReady(msg) {
     const state = getState();
@@ -791,8 +793,7 @@ async function handleChunkReady(msg) {
     if (!transfer) return;
 
     // Guard against duplicate chunk_ready for same chunkNo
-    if (transfer.pendingDownloads.has(chunkNo) || transfer.chunks[chunkNo]) return;
-    transfer.pendingDownloads.add(chunkNo);
+    if (transfer.chunks[chunkNo]) return;
 
     try {
         // Binary download: returns { data: ArrayBuffer, iv: string (base64), lastChunk, chunkNo }
@@ -817,7 +818,6 @@ async function handleChunkReady(msg) {
             });
 
             if (transfer.chunkTimings.length >= ADAPTIVE_WARMUP_CHUNKS) {
-                // Calculate average throughput across warmup chunks
                 const totalBytes = transfer.chunkTimings.reduce((s, t) => s + t.bytes, 0);
                 const totalMs = transfer.chunkTimings.reduce((s, t) => s + t.elapsedMs, 0);
                 const newSize = computeAdaptiveChunkSize(
@@ -835,14 +835,12 @@ async function handleChunkReady(msg) {
         // Reset timer for next chunk
         transfer._chunkStartTime = performance.now();
 
-        // ACK this chunk. Include current chunkSize so server can pass it to source.
-        ws.send({ type: 'chunk_ack', transferCode, chunkSize: transfer.chunkSize });
+        // ACK this chunk. Server will request the next chunk from the source.
+        ws.send({ type: 'chunk_ack', transferCode, chunkNo, chunkSize: transfer.chunkSize });
     } catch (err) {
         console.error('Failed to download chunk:', err);
         transfer.status = 'Error: ' + err.message;
         ui.renderTransfers(state.activeTransfers);
-    } finally {
-        transfer.pendingDownloads.delete(chunkNo);
     }
 }
 
@@ -880,19 +878,141 @@ async function handleTransferComplete(msg) {
         URL.revokeObjectURL(url);
 
         ui.showInfo(`File "${transfer.fileName}" downloaded successfully`);
+        state.activeTransfers.delete(msg.transferCode);
+        ui.renderTransfers(state.activeTransfers);
+        onBatchTransferCompleted(msg.transferCode, true);
     } catch (err) {
         ui.showError('clipboard-error', 'Failed to reconstruct file: ' + err.message);
+        state.activeTransfers.delete(msg.transferCode);
+        ui.renderTransfers(state.activeTransfers);
+        onBatchTransferCompleted(msg.transferCode, false);
     }
-
-    state.activeTransfers.delete(msg.transferCode);
-    ui.renderTransfers(state.activeTransfers);
 }
 
 function handleTransferCancelled(msg) {
     const state = getState();
     state.activeTransfers.delete(msg.transferCode);
     ui.renderTransfers(state.activeTransfers);
-    ui.showInfo('Transfer cancelled');
+    onBatchTransferCompleted(msg.transferCode, false);
+    if (!batchDownload || !batchDownload.active) {
+        ui.showInfo('Transfer cancelled');
+    }
+}
+
+// ============================================================
+// DOWNLOAD ALL — SEQUENTIAL BATCH DOWNLOAD
+// ============================================================
+
+/**
+ * Batch download state. Null when no batch is active.
+ * { queue: string[], total: number, completed: number, failed: number, active: true, currentTransferCode: string|null }
+ */
+let batchDownload = null;
+
+function handleDownloadAllAction(event) {
+    const btn = event.target.closest('#btn-download-all');
+    if (btn) {
+        downloadAll();
+        return;
+    }
+    const cancelBtn = event.target.closest('#btn-cancel-download-all');
+    if (cancelBtn) {
+        cancelBatchDownload();
+    }
+}
+
+async function downloadAll() {
+    if (batchDownload && batchDownload.active) return; // prevent duplicate
+
+    const state = getState();
+    const downloadable = state.files.filter(f =>
+        f.sourceDeviceId !== state.deviceId && f.sourceOnline
+    );
+
+    if (downloadable.length === 0) return;
+
+    batchDownload = {
+        queue: downloadable.map(f => f.fileCode),
+        total: downloadable.length,
+        completed: 0,
+        failed: 0,
+        active: true,
+        currentTransferCode: null,
+    };
+
+    updateDownloadAllButton();
+    startNextBatchDownload();
+}
+
+function startNextBatchDownload() {
+    if (!batchDownload || !batchDownload.active) return;
+
+    if (batchDownload.queue.length === 0) {
+        // Batch complete
+        const msg = batchDownload.failed > 0
+            ? `Batch download finished: ${batchDownload.completed} completed, ${batchDownload.failed} failed`
+            : `All ${batchDownload.completed} files downloaded successfully`;
+        ui.showInfo(msg);
+        batchDownload = null;
+        updateDownloadAllButton();
+        return;
+    }
+
+    const fileCode = batchDownload.queue.shift();
+    const state = getState();
+    const file = state.files.find(f => f.fileCode === fileCode);
+
+    // Skip if file no longer available
+    if (!file || !file.sourceOnline || file.sourceDeviceId === state.deviceId) {
+        batchDownload.failed++;
+        updateDownloadAllButton();
+        startNextBatchDownload();
+        return;
+    }
+
+    startDownload(fileCode);
+}
+
+function cancelBatchDownload() {
+    if (!batchDownload) return;
+
+    // Cancel current in-progress transfer if any
+    if (batchDownload.currentTransferCode) {
+        ws.send({ type: 'transfer_cancel', transferCode: batchDownload.currentTransferCode });
+    }
+
+    batchDownload.active = false;
+    batchDownload = null;
+    updateDownloadAllButton();
+    ui.showInfo('Batch download cancelled');
+}
+
+function onBatchTransferStarted(transferCode) {
+    if (batchDownload && batchDownload.active) {
+        batchDownload.currentTransferCode = transferCode;
+    }
+}
+
+function onBatchTransferCompleted(transferCode, success) {
+    if (!batchDownload || !batchDownload.active) return;
+    if (batchDownload.currentTransferCode !== transferCode) return;
+
+    batchDownload.currentTransferCode = null;
+    if (success) {
+        batchDownload.completed++;
+    } else {
+        batchDownload.failed++;
+    }
+    updateDownloadAllButton();
+    startNextBatchDownload();
+}
+
+function updateDownloadAllButton() {
+    const state = getState();
+    const downloadableCount = state.files.filter(f =>
+        f.sourceDeviceId !== state.deviceId && f.sourceOnline
+    ).length;
+    ui.renderDownloadAllButton(downloadableCount, batchDownload);
 }
 
 // --- Refresh file list ---
@@ -904,6 +1024,7 @@ async function refreshFileList() {
         const clipState = await api.getClipboardState(state.clipboardCode);
         setState({ files: clipState.files });
         await ui.renderFileList(clipState.files);
+        updateDownloadAllButton();
     } catch { /* ignore refresh errors */ }
 }
 

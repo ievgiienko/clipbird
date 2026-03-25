@@ -6,6 +6,8 @@ set SERVER=root@204.168.204.134
 set IMAGE_NAME=clipbird-app
 set ARCHIVE_NAME=clipbird.tar.gz
 
+del %ARCHIVE_NAME%
+
 echo === Step 1: Building Docker image ===
 call build-image.bat
 if %ERRORLEVEL% neq 0 (
