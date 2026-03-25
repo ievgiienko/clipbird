@@ -72,8 +72,11 @@ export async function getFileMeta(fileCode) {
 /**
  * Read a chunk of a stored file.
  * Returns an ArrayBuffer.
+ * @param {string} fileCode
+ * @param {number} byteOffset - absolute byte position to start reading from
+ * @param {number} chunkSize - number of bytes to read
  */
-export async function readChunk(fileCode, chunkNo, chunkSize) {
+export async function readChunk(fileCode, byteOffset, chunkSize) {
     const database = await getDb();
     return new Promise((resolve, reject) => {
         const tx = database.transaction(STORE_NAME, 'readonly');
@@ -85,7 +88,7 @@ export async function readChunk(fileCode, chunkNo, chunkSize) {
                 return;
             }
             const file = request.result.data;
-            const start = chunkNo * chunkSize;
+            const start = byteOffset;
             const end = Math.min(start + chunkSize, file.size);
             const blob = file.slice(start, end);
 

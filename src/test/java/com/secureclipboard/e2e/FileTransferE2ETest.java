@@ -10,7 +10,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -40,13 +39,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestRedisConfig.class)
 @ActiveProfiles("test")
-@TestPropertySource(properties = {
-        // Fix chunk size to avoid adaptive sizing offset bug in readChunk.
-        // With varying chunk sizes, readChunk computes start = chunkNo * chunkSize
-        // which misaligns when chunkSize changes between chunks.
-        "app.clipboard.min-chunk-size-bytes=1048576",
-        "app.clipboard.max-chunk-size-bytes=1048576"
-})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class FileTransferE2ETest {
