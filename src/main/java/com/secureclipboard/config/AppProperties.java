@@ -25,9 +25,9 @@ public class AppProperties {
         private int ttlHours = 24;
         private long maxTextSizeBytes = 10_485_760;
         private long maxFileSizeBytes = 524_288_000;
-        private int chunkSizeBytes = 5_242_880;
+        private int chunkSizeBytes = 1_048_576;      // 1 MB
         private int minChunkSizeBytes = 262_144;       // 256 KB
-        private int maxChunkSizeBytes = 10_485_760;     // 10 MB
+        private int maxChunkSizeBytes = 5_242_880;      // 5 MB
 
         public int getIdLength() { return idLength; }
         public void setIdLength(int idLength) { this.idLength = idLength; }

@@ -15,8 +15,8 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-echo === Step 2: Uploading %ARCHIVE_NAME% to server ===
-scp -i "%SSH_KEY%" %ARCHIVE_NAME% %SERVER%:/root/%ARCHIVE_NAME%
+echo === Step 2: Uploading %ARCHIVE_NAME%, .env, and docker-compose.yml to server ===
+scp -i "%SSH_KEY%" %ARCHIVE_NAME% .env docker-compose.yml %SERVER%:/root/
 if %ERRORLEVEL% neq 0 (
     echo ERROR: Upload failed.
     exit /b 1

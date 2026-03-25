@@ -45,7 +45,11 @@
       "Bash(cd:*)",
       "Bash(find /c/Projects/secure-clipboard/src/main/java -name *Controller* -o -name *controller*)",
       "Bash(xargs grep:*)",
-      "Bash(grep -E \"\\\\.\\(java\\)$\")"
+      "Bash(grep -E \"\\\\.\\(java\\)$\")",
+      "Bash(find /c/Projects/secure-clipboard -name *.sql -o -name *migration* -o -name V*.sql)",
+      "Bash(xargs ls:*)",
+      "Bash(xargs -I{} jar tf {})",
+      "Bash(JAVA_HOME=\"C:/Program Files/Java/jdk-26\" \"$JAVA_HOME/bin/jar\" tf /c/Users/ievgi/.m2/repository/org/springframework/boot/spring-boot-data-redis/4.0.4/spring-boot-data-redis-4.0.4.jar)"
     ]
   }
 }
