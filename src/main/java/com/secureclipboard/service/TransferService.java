@@ -18,10 +18,13 @@ import java.time.temporal.ChronoUnit;
  *
  * Transfer flow (one chunk at a time):
  *   1. Target requests a chunk from the source via WebSocket.
- *   2. Source encrypts and uploads the chunk to the server (single temp slot).
+ *   2. Source encrypts and uploads the chunk to the server (stored in Redis).
  *   3. Target downloads the chunk and sends ACK.
- *   4. Server clears the temp slot and advances to the next chunk.
+ *   4. Server clears the Redis chunk and advances to the next chunk.
  *   5. Repeat until all chunks are transferred.
+ *
+ * Temporary chunk data is stored in Redis (not MySQL).
+ * Transfer metadata (status, progress) remains in MySQL.
  */
 @Service
 public class TransferService {
@@ -32,17 +35,20 @@ public class TransferService {
     private final ClipboardFileRepository fileRepo;
     private final ClipboardService clipboardService;
     private final DeviceSessionManager sessionManager;
+    private final RedisChunkStore chunkStore;
     private final AppProperties appProps;
 
     public TransferService(ChunkTransferRepository transferRepo,
                            ClipboardFileRepository fileRepo,
                            ClipboardService clipboardService,
                            DeviceSessionManager sessionManager,
+                           RedisChunkStore chunkStore,
                            AppProperties appProps) {
         this.transferRepo = transferRepo;
         this.fileRepo = fileRepo;
         this.clipboardService = clipboardService;
         this.sessionManager = sessionManager;
+        this.chunkStore = chunkStore;
         this.appProps = appProps;
     }
 
@@ -79,7 +85,7 @@ public class TransferService {
     }
 
     /**
-     * Upload an encrypted chunk into the single buffer slot.
+     * Upload an encrypted chunk into Redis.
      * Binary data is stored directly (no base64 conversion).
      */
     @Transactional
@@ -87,12 +93,11 @@ public class TransferService {
         ChunkTransfer transfer = findTransfer(transferCode);
         validateTransferActive(transfer);
 
-        if (transfer.getTempChunkData() != null) {
+        if (transfer.getTempChunkNo() != null) {
             throw new IllegalStateException("Chunk buffer slot is full. Wait for target to download.");
         }
 
-        transfer.setTempChunkData(data);
-        transfer.setTempChunkIv(iv);
+        chunkStore.store(transferCode, chunkNo, data, iv);
         transfer.setTempChunkNo(chunkNo);
         transfer.setStatus(TransferStatus.CHUNK_READY);
         transferRepo.save(transfer);
@@ -100,37 +105,44 @@ public class TransferService {
     }
 
     /**
-     * Download the buffered chunk.
+     * Download the buffered chunk from Redis.
      * Returns raw encrypted bytes (binary, not base64).
      */
     @Transactional(readOnly = true)
     public ChunkDownloadResponse downloadChunk(String transferCode, int chunkNo) {
         ChunkTransfer transfer = findTransfer(transferCode);
-        if (transfer.getTempChunkData() == null) {
+
+        if (transfer.getTempChunkNo() == null) {
             throw new IllegalStateException("No chunk ready for download");
         }
 
-        if (transfer.getTempChunkNo() == null || transfer.getTempChunkNo() != chunkNo) {
+        if (transfer.getTempChunkNo() != chunkNo) {
             throw new IllegalArgumentException("Requested chunk " + chunkNo + " is not buffered. " +
                 "Buffered: " + transfer.getTempChunkNo());
         }
 
+        byte[] data = chunkStore.getData(transferCode, chunkNo);
+        if (data == null) {
+            throw new IllegalStateException("Chunk data not found in store");
+        }
+
+        String iv = chunkStore.getIv(transferCode, chunkNo);
         boolean lastChunk = (chunkNo >= transfer.getTotalChunks() - 1);
-        return new ChunkDownloadResponse(chunkNo, transfer.getTempChunkData(), transfer.getTempChunkIv(), lastChunk);
+        return new ChunkDownloadResponse(chunkNo, data, iv, lastChunk);
     }
 
     /**
      * Acknowledge that the target has downloaded the current chunk.
-     * Clears the buffer slot and advances state.
+     * Clears the Redis chunk and advances state.
      */
     @Transactional
     public TransferResponse acknowledgeChunk(String transferCode) {
         ChunkTransfer transfer = findTransfer(transferCode);
 
-        // Clear the temp slot
         int ackedChunk = transfer.getTempChunkNo() != null ? transfer.getTempChunkNo() : transfer.getCurrentChunkNo();
-        transfer.setTempChunkData(null);
-        transfer.setTempChunkIv(null);
+
+        // Clear chunk from Redis
+        chunkStore.delete(transferCode, ackedChunk);
         transfer.setTempChunkNo(null);
 
         int nextExpected = ackedChunk + 1;
@@ -151,10 +163,11 @@ public class TransferService {
     public void cancelTransfer(String transferCode) {
         ChunkTransfer transfer = findTransfer(transferCode);
         transfer.setStatus(TransferStatus.CANCELLED);
-        transfer.setTempChunkData(null);
-        transfer.setTempChunkIv(null);
         transfer.setTempChunkNo(null);
         transferRepo.save(transfer);
+
+        // Clean up any remaining chunks in Redis
+        chunkStore.deleteAll(transferCode);
         log.info("Transfer cancelled: {}", transferCode);
     }
 

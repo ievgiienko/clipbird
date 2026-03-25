@@ -18,17 +18,34 @@ services:
       retries: 5
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: clipboard-redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    #ports:
+    #  - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   app:
     image: clipbird-app
     container_name: clipbird-app
-    #ports:
-    #  - "${SERVER_PORT:-8080}:8080"
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_NAME: ${DB_NAME:-secure_clipboard}
       DB_USER: ${DB_USER:-clipboard_user}
       DB_PASSWORD: ${DB_PASSWORD:?Run 'bash init-env.sh' to generate .env}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       SERVER_PORT: 8080
       CLIPBOARD_TTL_HOURS: ${CLIPBOARD_TTL_HOURS:-24}
       CHUNK_SIZE: ${CHUNK_SIZE:-5242880}
@@ -38,7 +55,10 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   mysql_data:
+  redis_data:

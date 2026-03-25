@@ -38,14 +38,7 @@ public class ChunkTransfer {
     @Enumerated(EnumType.STRING)
     private TransferStatus status = TransferStatus.PENDING;
 
-    // --- Single temp chunk slot ---
-    @Lob
-    @Column(name = "temp_chunk_data", columnDefinition = "LONGBLOB")
-    private byte[] tempChunkData;
-
-    @Column(name = "temp_chunk_iv", length = 64)
-    private String tempChunkIv;
-
+    // Tracks which chunk number is currently buffered in Redis (null = no chunk buffered)
     @Column(name = "temp_chunk_no")
     private Integer tempChunkNo;
 
@@ -86,12 +79,6 @@ public class ChunkTransfer {
 
     public TransferStatus getStatus() { return status; }
     public void setStatus(TransferStatus status) { this.status = status; }
-
-    public byte[] getTempChunkData() { return tempChunkData; }
-    public void setTempChunkData(byte[] tempChunkData) { this.tempChunkData = tempChunkData; }
-
-    public String getTempChunkIv() { return tempChunkIv; }
-    public void setTempChunkIv(String tempChunkIv) { this.tempChunkIv = tempChunkIv; }
 
     public Integer getTempChunkNo() { return tempChunkNo; }
     public void setTempChunkNo(Integer tempChunkNo) { this.tempChunkNo = tempChunkNo; }

@@ -23,7 +23,7 @@ mvn test -Dtest=ClipboardServiceTest#shouldCreateClipboard
 # Compile only (no tests, no package)
 mvn compile
 
-# Start with Docker Compose (MySQL + app)
+# Start with Docker Compose (MySQL + Redis + app)
 bash init-env.sh   # generates .env with random DB passwords
 docker compose up --build -d
 ```
@@ -49,20 +49,25 @@ This ensures both the creating device and any joining device derive the same has
 Files are never fully uploaded to the server. The server acts as a single-chunk relay:
 1. Target device requests download → server signals source device via WebSocket
 2. Source reads chunk from IndexedDB, encrypts it, uploads to server relay endpoint
-3. Target downloads the encrypted chunk, decrypts locally, sends ACK
-4. Server deletes temp chunk, requests next one from source
+3. Target downloads the encrypted chunk from Redis, decrypts locally, sends ACK
+4. Server deletes temp chunk from Redis, requests next one from source
 
-Only one encrypted chunk is held server-side at any time per transfer.
+Only one encrypted chunk is held server-side at any time per transfer. Temporary chunk data is stored in Redis (not MySQL) with TTL-based auto-expiration. Adaptive chunk sizing constrains chunks to 256 KB–5 MB based on measured throughput.
 
 ### Session Management
 
-`DeviceSessionManager` tracks WebSocket sessions in `ConcurrentHashMap` (clipboardCode → deviceId → session). This is MVP-only; horizontal scaling requires replacing with Redis pub/sub.
+`DeviceSessionManager` keeps WebSocket session objects in-memory (they are not serializable) and mirrors device presence metadata to Redis via `RedisSessionStore`. Redis stores clipboard-to-device mappings with TTL for automatic stale session cleanup and future horizontal scaling.
+
+### Storage Boundaries
+
+- **MySQL**: Durable relational data — clipboards, files, transfers (metadata/status), text snapshots
+- **Redis**: Ephemeral state — device presence, temporary encrypted chunk data (with TTL)
 
 ### Cleanup
 
 `CleanupService` runs three scheduled tasks:
 1. **Expire active clipboards** past TTL — sets status to EXPIRED, removes child records (text snapshots, files, transfers), closes WebSocket sessions.
-2. **Fail abandoned transfers** — marks expired in-progress transfers as FAILED, clears temp chunk data.
+2. **Fail abandoned transfers** — marks expired in-progress transfers as FAILED, clears temp chunk data from Redis.
 3. **Hard-delete old clipboards** — permanently removes DELETED/EXPIRED clipboard rows (and any remaining child records) after a configurable retention period (`app.cleanup.hard-delete-delay-hours`, default 168h / 7 days). This frees clipboard codes for reuse. Can be disabled via `app.cleanup.hard-delete-enabled: false`.
 
 ## Key Conventions
@@ -76,4 +81,4 @@ Only one encrypted chunk is held server-side at any time per transfer.
 
 ## Test Setup
 
-Tests use H2 in-memory database with `spring.jpa.hibernate.ddl-auto: create-drop` (Flyway disabled). Test config is in `src/test/resources/application.yml`. Spring Boot 4 requires `spring-boot-webmvc-test` as a separate dependency for `@AutoConfigureMockMvc` (import from `org.springframework.boot.webmvc.test.autoconfigure`).
+Tests use H2 in-memory database with `spring.jpa.hibernate.ddl-auto: create-drop` (Flyway disabled). Redis auto-configuration is excluded in tests; `TestRedisConfig` provides a mocked `RedisTemplate` backed by `ConcurrentHashMap` so no real Redis server is needed. All test classes must use `@Import(TestRedisConfig.class)`. Test config is in `src/test/resources/application.yml`. Spring Boot 4 requires `spring-boot-webmvc-test` as a separate dependency for `@AutoConfigureMockMvc` (import from `org.springframework.boot.webmvc.test.autoconfigure`).

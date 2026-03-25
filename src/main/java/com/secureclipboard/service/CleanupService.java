@@ -23,6 +23,7 @@ public class CleanupService {
     private final ClipboardFileRepository fileRepo;
     private final ChunkTransferRepository transferRepo;
     private final DeviceSessionManager sessionManager;
+    private final RedisChunkStore chunkStore;
     private final AppProperties appProps;
 
     public CleanupService(ClipboardRepository clipboardRepo,
@@ -30,12 +31,14 @@ public class CleanupService {
                           ClipboardFileRepository fileRepo,
                           ChunkTransferRepository transferRepo,
                           DeviceSessionManager sessionManager,
+                          RedisChunkStore chunkStore,
                           AppProperties appProps) {
         this.clipboardRepo = clipboardRepo;
         this.textRepo = textRepo;
         this.fileRepo = fileRepo;
         this.transferRepo = transferRepo;
         this.sessionManager = sessionManager;
+        this.chunkStore = chunkStore;
         this.appProps = appProps;
     }
 
@@ -51,6 +54,10 @@ public class CleanupService {
             clipboard.setTextSnapshot(null);
             clipboard.setStatus(ClipboardStatus.EXPIRED);
             clipboardRepo.saveAndFlush(clipboard);
+
+            // Clean up Redis chunks for any active transfers
+            cleanupTransferChunks(clipId);
+
             transferRepo.deleteByClipboardId(clipId);
             fileRepo.deleteByClipboardId(clipId);
             textRepo.deleteByClipboardId(clipId);
@@ -86,7 +93,9 @@ public class CleanupService {
             try {
                 Long clipId = clipboard.getId();
                 String code = clipboard.getClipboardCode();
-                // Remove any remaining child records (safety net; normally already cleaned up)
+
+                cleanupTransferChunks(clipId);
+
                 transferRepo.deleteByClipboardId(clipId);
                 fileRepo.deleteByClipboardId(clipId);
                 textRepo.deleteByClipboardId(clipId);
@@ -115,10 +124,21 @@ public class CleanupService {
         for (ChunkTransfer transfer : expired) {
             log.info("Cleaning up expired transfer: {}", transfer.getTransferCode());
             transfer.setStatus(TransferStatus.FAILED);
-            transfer.setTempChunkData(null);
-            transfer.setTempChunkIv(null);
             transfer.setTempChunkNo(null);
             transferRepo.save(transfer);
+
+            // Clean up any remaining chunks in Redis
+            chunkStore.deleteAll(transfer.getTransferCode());
+        }
+    }
+
+    /**
+     * Clean up Redis chunks for all transfers belonging to a clipboard.
+     */
+    private void cleanupTransferChunks(Long clipboardId) {
+        List<ChunkTransfer> transfers = transferRepo.findByClipboardId(clipboardId);
+        for (ChunkTransfer transfer : transfers) {
+            chunkStore.deleteAll(transfer.getTransferCode());
         }
     }
 }

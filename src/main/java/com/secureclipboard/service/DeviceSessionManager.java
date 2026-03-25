@@ -12,27 +12,34 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages WebSocket sessions grouped by clipboard code.
- * In-memory for MVP; can be replaced with Redis for horizontal scaling.
+ *
+ * WebSocket session objects stay in-memory (they are not serializable).
+ * Device presence metadata is mirrored to Redis via RedisSessionStore
+ * for durability, TTL-based cleanup, and future horizontal scaling.
  */
 @Component
 public class DeviceSessionManager {
 
     private static final Logger log = LoggerFactory.getLogger(DeviceSessionManager.class);
 
-    // clipboardCode -> { deviceId -> session }
+    // Local WebSocket session maps (required for message delivery)
     private final Map<String, Map<String, WebSocketSession>> rooms = new ConcurrentHashMap<>();
-
-    // sessionId -> deviceId
     private final Map<String, String> sessionToDevice = new ConcurrentHashMap<>();
-
-    // sessionId -> clipboardCode
     private final Map<String, String> sessionToClipboard = new ConcurrentHashMap<>();
+
+    private final RedisSessionStore redisSessionStore;
+
+    public DeviceSessionManager(RedisSessionStore redisSessionStore) {
+        this.redisSessionStore = redisSessionStore;
+    }
 
     public void join(String clipboardCode, String deviceId, WebSocketSession session) {
         rooms.computeIfAbsent(clipboardCode, k -> new ConcurrentHashMap<>())
              .put(deviceId, session);
         sessionToDevice.put(session.getId(), deviceId);
         sessionToClipboard.put(session.getId(), clipboardCode);
+
+        redisSessionStore.registerDevice(clipboardCode, deviceId, session.getId());
         log.info("Device {} joined clipboard {}", deviceId, clipboardCode);
     }
 
@@ -47,6 +54,7 @@ public class DeviceSessionManager {
                     rooms.remove(clipboardCode);
                 }
             }
+            redisSessionStore.unregisterDevice(clipboardCode, deviceId, session.getId());
             log.info("Device {} left clipboard {}", deviceId, clipboardCode);
         }
     }
@@ -93,5 +101,6 @@ public class DeviceSessionManager {
                 sessionToClipboard.remove(session.getId());
             });
         }
+        redisSessionStore.removeClipboard(clipboardCode);
     }
 }
