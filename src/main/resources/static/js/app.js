@@ -710,12 +710,14 @@ async function startDownload(fileCode) {
             maxChunkSize: transfer.maxChunkSize || MAX_CHUNK_SIZE,
             adaptiveResolved: false,
             chunkTimings: [],
+            // Cumulative byte offset for variable-size chunk reads
+            nextByteOffset: 0,
         });
         ui.renderTransfers(state.activeTransfers);
         onBatchTransferStarted(transfer.transferCode);
 
-        // Request the first chunk from the source
-        requestChunkFromSource(transfer.transferCode, fileCode, file.sourceDeviceId, 0, transfer.defaultChunkSize || CHUNK_SIZE);
+        // Request the first chunk from the source (byteOffset=0 for first chunk)
+        requestChunkFromSource(transfer.transferCode, fileCode, file.sourceDeviceId, 0, transfer.defaultChunkSize || CHUNK_SIZE, 0);
         // Record start time for adaptive sizing measurement
         state.activeTransfers.get(transfer.transferCode)._chunkStartTime = performance.now();
     } catch (err) {
@@ -731,15 +733,17 @@ async function startDownload(fileCode) {
 /**
  * Send a WebSocket message requesting the source device to upload a chunk.
  */
-function requestChunkFromSource(transferCode, fileCode, sourceDeviceId, chunkNo, chunkSize) {
-    ws.send({
+function requestChunkFromSource(transferCode, fileCode, sourceDeviceId, chunkNo, chunkSize, byteOffset) {
+    const msg = {
         type: 'transfer_request',
         transferCode,
         fileCode,
         sourceDeviceId,
         chunkNo,
         chunkSize
-    });
+    };
+    if (byteOffset != null) msg.byteOffset = byteOffset;
+    ws.send(msg);
 }
 
 // ============================================================
@@ -759,7 +763,9 @@ async function handleSendChunkRequest(msg) {
         const file = state.files.find(f => f.fileCode === fileCode);
         // Use the chunk size from the message (adaptive) or fall back to file/default
         const chunkSize = msg.chunkSize || (file ? file.chunkSize : CHUNK_SIZE);
-        const chunkData = await fileStore.readChunk(fileCode, chunkNo, chunkSize);
+        // Use explicit byteOffset if provided, otherwise fall back to chunkNo * chunkSize
+        const byteOffset = msg.byteOffset != null ? msg.byteOffset : chunkNo * chunkSize;
+        const chunkData = await fileStore.readChunk(fileCode, byteOffset, chunkSize);
 
         // Binary encryption: returns { data: ArrayBuffer, iv: Uint8Array }
         const encrypted = await crypto.encryptChunkBinary(state.cryptoKey, chunkData);
@@ -839,8 +845,11 @@ async function handleChunkReady(msg) {
         // Reset timer for next chunk
         transfer._chunkStartTime = performance.now();
 
+        // Track cumulative byte offset for variable-size chunk reads
+        transfer.nextByteOffset = (transfer.nextByteOffset || 0) + decrypted.byteLength;
+
         // ACK this chunk. Server will request the next chunk from the source.
-        ws.send({ type: 'chunk_ack', transferCode, chunkNo, chunkSize: transfer.chunkSize });
+        ws.send({ type: 'chunk_ack', transferCode, chunkNo, chunkSize: transfer.chunkSize, byteOffset: transfer.nextByteOffset });
     } catch (err) {
         console.error('Failed to download chunk:', err);
         transfer.status = 'Error: ' + err.message;

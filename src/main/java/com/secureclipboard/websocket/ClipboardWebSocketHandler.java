@@ -196,6 +196,7 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
         String sourceDeviceId = payload.path("sourceDeviceId").asText();
         int chunkNo = payload.path("chunkNo").asInt(0);
         int chunkSize = payload.path("chunkSize").asInt(0);
+        long byteOffset = payload.path("byteOffset").asLong(-1);
 
         WebSocketSession sourceSession = sessionManager.getSession(clipboardCode, sourceDeviceId);
         if (sourceSession != null && sourceSession.isOpen()) {
@@ -206,6 +207,9 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
             msg.put("chunkNo", chunkNo);
             if (chunkSize > 0) {
                 msg.put("chunkSize", chunkSize);
+            }
+            if (byteOffset >= 0) {
+                msg.put("byteOffset", byteOffset);
             }
             sendMessage(sourceSession, msg.toString());
         } else {
@@ -242,6 +246,7 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
     private void handleChunkAck(WebSocketSession session, JsonNode payload) throws IOException {
         String transferCode = payload.path("transferCode").asText();
         int chunkSize = payload.path("chunkSize").asInt(0);
+        long byteOffset = payload.path("byteOffset").asLong(-1);
         TransferResponse transferResp = transferService.acknowledgeChunk(transferCode);
 
         String clipboardCode = sessionManager.getClipboardCode(session);
@@ -267,6 +272,9 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
                     msg.put("chunkNo", nextChunk);
                     if (chunkSize > 0) {
                         msg.put("chunkSize", chunkSize);
+                    }
+                    if (byteOffset >= 0) {
+                        msg.put("byteOffset", byteOffset);
                     }
                     sendMessage(sourceSession, msg.toString());
                 }
