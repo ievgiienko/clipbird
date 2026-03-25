@@ -117,6 +117,10 @@ public class CleanupService {
             transfer.setStatus(TransferStatus.FAILED);
             transfer.setTempChunkData(null);
             transfer.setTempChunkIv(null);
+            transfer.setTempChunkNo(null);
+            transfer.setTempChunkDataB(null);
+            transfer.setTempChunkIvB(null);
+            transfer.setTempChunkNoB(null);
             transferRepo.save(transfer);
         }
     }

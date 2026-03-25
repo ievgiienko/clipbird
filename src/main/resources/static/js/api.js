@@ -68,12 +68,47 @@ export async function getTransfer(transferCode) {
     return request('GET', `/transfers/${transferCode}`);
 }
 
+/**
+ * Upload an encrypted chunk as binary via multipart/form-data.
+ * @param {string} transferCode
+ * @param {number} chunkNo
+ * @param {ArrayBuffer} data - raw encrypted bytes
+ * @param {string} iv - base64-encoded IV string
+ */
 export async function uploadChunk(transferCode, chunkNo, data, iv) {
-    return request('PUT', `/transfers/${transferCode}/chunks/${chunkNo}`, { data, iv });
+    const formData = new FormData();
+    formData.append('data', new Blob([data], { type: 'application/octet-stream' }), 'chunk');
+    formData.append('iv', iv);
+
+    const res = await fetch(`${BASE_URL}/transfers/${transferCode}/chunks/${chunkNo}`, {
+        method: 'PUT',
+        body: formData
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(err.message || `HTTP ${res.status}`);
+    }
 }
 
+/**
+ * Download an encrypted chunk as binary.
+ * Returns { data: ArrayBuffer, iv: string (base64), lastChunk: boolean, chunkNo: number }
+ */
 export async function downloadChunk(transferCode, chunkNo) {
-    return request('GET', `/transfers/${transferCode}/chunks/${chunkNo}`);
+    const res = await fetch(`${BASE_URL}/transfers/${transferCode}/chunks/${chunkNo}`);
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(err.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.arrayBuffer();
+    const iv = res.headers.get('X-Chunk-IV');
+    const lastChunk = res.headers.get('X-Last-Chunk') === 'true';
+    const returnedChunkNo = parseInt(res.headers.get('X-Chunk-No') || chunkNo, 10);
+
+    return { data, iv, lastChunk, chunkNo: returnedChunkNo };
 }
 
 export async function acknowledgeChunk(transferCode) {
