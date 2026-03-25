@@ -11,6 +11,7 @@ import { getState, setState, resetState, generateDeviceId } from './state.js';
 import * as ui from './ui.js';
 import * as router from './router.js';
 import { generateQR, toSvg } from './qr.js';
+import * as passwordStrength from './password-strength.js';
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
 const TEXT_DEBOUNCE_MS = 500;
@@ -22,6 +23,7 @@ let ws = null;
 document.addEventListener('DOMContentLoaded', () => {
     setState({ deviceId: generateDeviceId() });
     bindEvents();
+    passwordStrength.bind('create-password', 'password-strength');
     router.init(onRouteChange);
 });
 
