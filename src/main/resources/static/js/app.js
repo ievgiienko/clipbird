@@ -12,6 +12,7 @@ import * as ui from './ui.js';
 import * as router from './router.js';
 import { generateQR, toSvg } from './qr.js';
 import * as passwordStrength from './password-strength.js';
+import { initTheme } from './theme.js';
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
 const TEXT_DEBOUNCE_MS = 500;
@@ -21,6 +22,7 @@ let ws = null;
 // --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
     setState({ deviceId: generateDeviceId() });
     bindEvents();
     passwordStrength.bind('create-password', 'password-strength');
