@@ -2,19 +2,21 @@ package com.secureclipboard;
 
 import com.secureclipboard.domain.Clipboard;
 import com.secureclipboard.domain.ClipboardStatus;
-import com.secureclipboard.dto.ClipboardCreatedResponse;
-import com.secureclipboard.dto.ClipboardStateResponse;
-import com.secureclipboard.dto.TextSnapshotDto;
+import com.secureclipboard.dto.*;
 import com.secureclipboard.repository.ClipboardRepository;
 import com.secureclipboard.service.ClipboardService;
+import com.secureclipboard.service.DeviceSessionManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.web.socket.WebSocketSession;
 
 import java.util.Base64;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -25,6 +27,9 @@ class ClipboardServiceTest {
 
     @Autowired
     private ClipboardRepository clipboardRepository;
+
+    @Autowired
+    private DeviceSessionManager sessionManager;
 
     @Test
     void shouldCreateClipboard() {
@@ -110,5 +115,49 @@ class ClipboardServiceTest {
 
         clipboardService.setPasswordHash(code, "hash1");
         assertThrows(IllegalStateException.class, () -> clipboardService.setPasswordHash(code, "hash2"));
+    }
+
+    @Test
+    void shouldStoreAndReturnFileHash() {
+        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        String code = created.clipboardCode();
+        clipboardService.setPasswordHash(code, "hash");
+
+        // Simulate source device online
+        WebSocketSession mockSession = mock(WebSocketSession.class);
+        when(mockSession.getId()).thenReturn("sess-" + UUID.randomUUID());
+        when(mockSession.isOpen()).thenReturn(true);
+        sessionManager.join(code, "source-dev", mockSession);
+
+        String expectedHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
+
+        FileManifestDto manifest = clipboardService.addFile(code, new AddFileRequest(
+            "enc-name", "enc-iv", "", "", 1000, 1, "source-dev", expectedHash
+        ));
+
+        assertEquals(expectedHash, manifest.fileHash());
+
+        // Verify hash is returned in clipboard state
+        ClipboardStateResponse state = clipboardService.getState(code);
+        assertEquals(1, state.files().size());
+        assertEquals(expectedHash, state.files().get(0).fileHash());
+    }
+
+    @Test
+    void shouldAllowNullFileHash() {
+        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        String code = created.clipboardCode();
+        clipboardService.setPasswordHash(code, "hash");
+
+        WebSocketSession mockSession = mock(WebSocketSession.class);
+        when(mockSession.getId()).thenReturn("sess-" + UUID.randomUUID());
+        when(mockSession.isOpen()).thenReturn(true);
+        sessionManager.join(code, "source-dev", mockSession);
+
+        FileManifestDto manifest = clipboardService.addFile(code, new AddFileRequest(
+            "enc-name", "enc-iv", "", "", 1000, 1, "source-dev", null
+        ));
+
+        assertNull(manifest.fileHash());
     }
 }
