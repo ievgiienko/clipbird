@@ -49,7 +49,11 @@
       "Bash(find /c/Projects/secure-clipboard -name *.sql -o -name *migration* -o -name V*.sql)",
       "Bash(xargs ls:*)",
       "Bash(xargs -I{} jar tf {})",
-      "Bash(JAVA_HOME=\"C:/Program Files/Java/jdk-26\" \"$JAVA_HOME/bin/jar\" tf /c/Users/ievgi/.m2/repository/org/springframework/boot/spring-boot-data-redis/4.0.4/spring-boot-data-redis-4.0.4.jar)"
+      "Bash(JAVA_HOME=\"C:/Program Files/Java/jdk-26\" \"$JAVA_HOME/bin/jar\" tf /c/Users/ievgi/.m2/repository/org/springframework/boot/spring-boot-data-redis/4.0.4/spring-boot-data-redis-4.0.4.jar)",
+      "Bash(mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args=\"install chromium\")",
+      "Bash(mvn dependency:copy-dependencies -DincludeArtifactIds=playwright -DincludeScope=test -DoutputDirectory=target/playwright-deps)",
+      "Bash(mvn dependency:copy-dependencies -DincludeScope=test -DoutputDirectory=target/playwright-deps)",
+      "Bash(mvn test-compile:*)"
     ]
   }
 }

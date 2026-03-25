@@ -91,6 +91,14 @@
             <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Playwright for browser E2E tests -->
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>1.50.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
