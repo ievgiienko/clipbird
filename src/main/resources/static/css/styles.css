@@ -316,6 +316,53 @@ textarea {
     font-size: 0.9rem;
 }
 
+/* --- Password Strength Indicator --- */
+
+.password-strength {
+    margin-top: 0.5rem;
+}
+
+.strength-bar {
+    display: flex;
+    gap: 4px;
+    height: 4px;
+    margin-bottom: 0.35rem;
+}
+
+.strength-segment {
+    flex: 1;
+    background: var(--border);
+    border-radius: 2px;
+    transition: background 0.25s;
+}
+
+.strength-segment.very-weak { background: var(--danger); }
+.strength-segment.weak      { background: #e67e22; }
+.strength-segment.medium    { background: var(--warning); }
+.strength-segment.strong    { background: var(--success); }
+
+.strength-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.strength-label.very-weak { color: var(--danger); }
+.strength-label.weak      { color: #e67e22; }
+.strength-label.medium    { color: var(--warning); }
+.strength-label.strong    { color: var(--success); }
+
+.strength-hints {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    margin-top: 0.3rem;
+}
+
+.strength-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
 /* --- Buttons --- */
 
 .btn {
