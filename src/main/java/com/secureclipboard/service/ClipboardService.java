@@ -130,7 +130,8 @@ public class ClipboardService {
             f.getChunkSize(),
             f.getTotalChunks(),
             f.getSourceDeviceId(),
-            sessionManager.isDeviceOnline(clipboardCode, f.getSourceDeviceId())
+            sessionManager.isDeviceOnline(clipboardCode, f.getSourceDeviceId()),
+            f.getFileHash()
         )).toList();
 
         return new ClipboardStateResponse(
@@ -192,6 +193,7 @@ public class ClipboardService {
         file.setChunkSize(appProps.getClipboard().getChunkSizeBytes());
         file.setTotalChunks(request.totalChunks());
         file.setSourceDeviceId(request.sourceDeviceId());
+        file.setFileHash(request.fileHash());
         file.setStatus(FileStatus.AVAILABLE);
         fileRepo.save(file);
 
@@ -206,7 +208,8 @@ public class ClipboardService {
             file.getChunkSize(),
             file.getTotalChunks(),
             file.getSourceDeviceId(),
-            sessionManager.isDeviceOnline(clipboardCode, file.getSourceDeviceId())
+            sessionManager.isDeviceOnline(clipboardCode, file.getSourceDeviceId()),
+            file.getFileHash()
         );
     }
 

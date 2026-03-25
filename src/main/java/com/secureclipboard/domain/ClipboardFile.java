@@ -42,6 +42,9 @@ public class ClipboardFile {
     @Column(name = "source_device_id", nullable = false, length = 64)
     private String sourceDeviceId;
 
+    @Column(name = "file_hash", length = 64)
+    private String fileHash;
+
     @Column(nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
     private FileStatus status = FileStatus.AVAILABLE;
@@ -89,6 +92,9 @@ public class ClipboardFile {
 
     public FileStatus getStatus() { return status; }
     public void setStatus(FileStatus status) { this.status = status; }
+
+    public String getFileHash() { return fileHash; }
+    public void setFileHash(String fileHash) { this.fileHash = fileHash; }
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }

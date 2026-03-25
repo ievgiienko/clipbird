@@ -10,5 +10,6 @@ public record AddFileRequest(
     String encryptedMimeIv,
     @Positive long sizeBytes,
     @Positive int totalChunks,
-    @NotBlank String sourceDeviceId
+    @NotBlank String sourceDeviceId,
+    String fileHash
 ) {}

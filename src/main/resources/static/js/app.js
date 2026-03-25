@@ -528,6 +528,9 @@ async function processFiles(files) {
         try {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
+            // Compute SHA-256 hash of the original plaintext file for integrity verification
+            const fileHash = await crypto.computeFileHash(file);
+
             const encName = await crypto.encryptString(state.cryptoKey, file.name);
             const encMime = file.type
                 ? await crypto.encryptString(state.cryptoKey, file.type)
@@ -540,7 +543,8 @@ async function processFiles(files) {
                 encryptedMimeIv: encMime.iv,
                 sizeBytes: file.size,
                 totalChunks,
-                sourceDeviceId: state.deviceId
+                sourceDeviceId: state.deviceId,
+                fileHash
             });
 
             await fileStore.storeFile(manifest.fileCode, file);
@@ -868,6 +872,20 @@ async function handleTransferComplete(msg) {
         }
 
         const blob = new Blob(orderedChunks);
+
+        // Verify file integrity if hash is available
+        const file = state.files.find(f => f.fileCode === transfer.fileCode);
+        const expectedHash = file && file.fileHash;
+        if (expectedHash) {
+            transfer.status = 'Verifying...';
+            ui.renderTransfers(state.activeTransfers);
+
+            const actualHash = await crypto.computeBlobHash(blob);
+            if (actualHash !== expectedHash) {
+                throw new Error('Integrity check failed: downloaded file does not match the original');
+            }
+        }
+
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

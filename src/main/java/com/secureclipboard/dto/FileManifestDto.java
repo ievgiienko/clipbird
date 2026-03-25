@@ -10,5 +10,6 @@ public record FileManifestDto(
     int chunkSize,
     int totalChunks,
     String sourceDeviceId,
-    boolean sourceOnline
+    boolean sourceOnline,
+    String fileHash
 ) {}

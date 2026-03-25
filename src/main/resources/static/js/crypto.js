@@ -192,6 +192,66 @@ export function generateSalt() {
     return bytesToBase64(salt);
 }
 
+/**
+ * Compute SHA-256 hash of a File object.
+ * Reads the file in chunks to avoid loading the entire file into memory at once.
+ * Returns hex-encoded hash string.
+ */
+export async function computeFileHash(file) {
+    const HASH_CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB read chunks
+    const totalSize = file.size;
+
+    // For small files, hash in one shot
+    if (totalSize <= HASH_CHUNK_SIZE) {
+        const buffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+        return bufferToHex(hashBuffer);
+    }
+
+    // For large files, read in chunks — but Web Crypto digest() doesn't support
+    // incremental updates, so we must read the whole file into memory.
+    // We read chunk-by-chunk to avoid blocking the main thread too long.
+    const chunks = [];
+    let offset = 0;
+    while (offset < totalSize) {
+        const end = Math.min(offset + HASH_CHUNK_SIZE, totalSize);
+        const blob = file.slice(offset, end);
+        const buffer = await blob.arrayBuffer();
+        chunks.push(new Uint8Array(buffer));
+        offset = end;
+    }
+
+    // Concatenate all chunks
+    const fullBuffer = new Uint8Array(totalSize);
+    let pos = 0;
+    for (const chunk of chunks) {
+        fullBuffer.set(chunk, pos);
+        pos += chunk.length;
+    }
+
+    const hashBuffer = await crypto.subtle.digest('SHA-256', fullBuffer);
+    return bufferToHex(hashBuffer);
+}
+
+/**
+ * Compute SHA-256 hash of a Blob (for verifying reconstructed files on target side).
+ * Returns hex-encoded hash string.
+ */
+export async function computeBlobHash(blob) {
+    const buffer = await blob.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    return bufferToHex(hashBuffer);
+}
+
+function bufferToHex(buffer) {
+    const bytes = new Uint8Array(buffer);
+    const hex = [];
+    for (let i = 0; i < bytes.length; i++) {
+        hex.push(bytes[i].toString(16).padStart(2, '0'));
+    }
+    return hex.join('');
+}
+
 // --- Base64 helpers ---
 
 export function bytesToBase64(bytes) {
