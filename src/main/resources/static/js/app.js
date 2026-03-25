@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function bindEvents() {
     // Create page
     document.getElementById('btn-create').addEventListener('click', handleCreate);
+    document.getElementById('btn-generate-password').addEventListener('click', handleGeneratePassword);
     onEnterKey('create-password-confirm', handleCreate);
 
     // Open page
@@ -78,6 +79,7 @@ function bindEvents() {
     document.getElementById('qr-modal').addEventListener('click', (e) => {
         if (e.target === e.currentTarget) ui.hideQrModal();
     });
+    document.getElementById('qr-trusted-device').addEventListener('change', handleQrTrustedToggle);
 
     // Delete confirmation modal
     document.getElementById('btn-confirm-delete').addEventListener('click', handleDelete);
@@ -117,11 +119,19 @@ function onRouteChange(route) {
     }
 
     if (route.page === 'clipboard' && route.code) {
+        // Trusted-device flow: read password from URL fragment and strip it immediately.
+        // The fragment is never sent to the server (RFC 3986).
+        // replaceState removes it from the address bar and current history entry.
+        const fragmentPassword = readAndStripFragment();
+
         if (state.clipboardCode === route.code && state.cryptoKey) {
             // Already authenticated for this clipboard
             ui.showUnlockedState(route.code);
+        } else if (fragmentPassword) {
+            // Auto-authenticate using password from QR fragment
+            autoOpenFromFragment(route.code, fragmentPassword);
         } else {
-            // Need password
+            // Need password — show manual entry
             ui.showLockedState(route.code);
         }
     }
@@ -129,6 +139,7 @@ function onRouteChange(route) {
     if (route.page === 'create') {
         document.getElementById('create-password').value = '';
         document.getElementById('create-password-confirm').value = '';
+        passwordStrength.reset('password-strength');
         ui.hideError('create-error');
         setTimeout(() => document.getElementById('create-password').focus(), 50);
     }
@@ -139,6 +150,67 @@ function onRouteChange(route) {
         ui.hideError('open-error');
         setTimeout(() => document.getElementById('open-code').focus(), 50);
     }
+}
+
+// --- Fragment handling (trusted-device flow) ---
+
+/**
+ * Read the URL fragment (hash) and immediately strip it from the address bar.
+ * Returns the decoded fragment value, or null if no fragment was present.
+ * The fragment is never sent to the server (RFC 3986).
+ * replaceState removes it from the address bar and current history entry.
+ */
+function readAndStripFragment() {
+    const hash = window.location.hash;
+    if (!hash || hash.length <= 1) return null;
+
+    const fragment = decodeURIComponent(hash.substring(1));
+
+    // Strip fragment immediately to minimize exposure
+    history.replaceState(null, '', window.location.pathname);
+
+    return fragment;
+}
+
+/**
+ * Attempt to open a clipboard using a password extracted from the URL fragment.
+ * On failure, falls back to the manual password entry UI.
+ */
+async function autoOpenFromFragment(code, password) {
+    // Show a transient locked state while authenticating
+    ui.showLockedState(code);
+    try {
+        await authenticateAndOpen(code, password, 'locked-error');
+    } catch {
+        // authenticateAndOpen already shows errors via showError;
+        // ensure the locked UI remains so the user can enter password manually.
+        ui.showLockedState(code);
+    }
+}
+
+// --- Generate random password ---
+
+function handleGeneratePassword() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+';
+    const length = 16;
+    const array = new Uint32Array(length);
+    window.crypto.getRandomValues(array);
+    let password = '';
+    for (let i = 0; i < length; i++) {
+        password += chars[array[i] % chars.length];
+    }
+
+    const input = document.getElementById('create-password');
+    input.value = password;
+    input.type = 'text';
+    setTimeout(() => { input.type = 'password'; }, 3000);
+
+    // Trigger strength indicator update
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    // Clear confirm field so user must re-type
+    document.getElementById('create-password-confirm').value = '';
+    document.getElementById('create-password-confirm').focus();
 }
 
 // --- Create clipboard ---
@@ -698,14 +770,41 @@ function handleCopyLink() {
 // --- QR code ---
 
 function handleShowQr() {
+    // Reset checkbox each time the modal is opened
+    document.getElementById('qr-trusted-device').checked = false;
+    updateQrNote(false);
+    renderQrCode(false);
+    document.getElementById('qr-modal').style.display = 'flex';
+}
+
+function handleQrTrustedToggle() {
+    const trusted = document.getElementById('qr-trusted-device').checked;
+    updateQrNote(trusted);
+    renderQrCode(trusted);
+}
+
+function renderQrCode(includeTrustedPassword) {
     const state = getState();
-    const url = ui.getClipboardUrl(state.clipboardCode);
+    const baseUrl = ui.getClipboardUrl(state.clipboardCode);
+    const qrUrl = includeTrustedPassword
+        ? `${baseUrl}#${encodeURIComponent(state.password)}`
+        : baseUrl;
     try {
-        const matrix = generateQR(url);
+        const matrix = generateQR(qrUrl);
         const svg = toSvg(matrix, 6);
-        ui.showQrModal(svg, url);
+        // Always display the clean URL (never show password)
+        ui.showQrCode(svg, baseUrl);
     } catch (err) {
         ui.showError('clipboard-error', 'Failed to generate QR code: ' + err.message);
+    }
+}
+
+function updateQrNote(trusted) {
+    const note = document.getElementById('qr-note');
+    if (trusted) {
+        note.textContent = 'The QR code now includes the password. The scanning device will be able to open the clipboard directly.';
+    } else {
+        note.textContent = 'Password is not included in the link. It must be entered manually on the other device.';
     }
 }
 

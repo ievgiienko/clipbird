@@ -1,6 +1,8 @@
-User-agent: *
-Allow: /
-Disallow: /api/
-Disallow: /ws/
+User-Agent: *
+Disallow: /api*
+Disallow: /ws*
+Disallow:
 
+
+Host: https://clipbird.net
 Sitemap: https://clipbird.net/sitemap.xml

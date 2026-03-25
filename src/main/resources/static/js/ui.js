@@ -116,9 +116,13 @@ function showCopyFeedback() {
 
 // --- QR Modal ---
 
-export function showQrModal(svgHtml, url) {
+export function showQrCode(svgHtml, displayUrl) {
     document.getElementById('qr-code').innerHTML = svgHtml;
-    document.getElementById('qr-url').textContent = url;
+    document.getElementById('qr-url').textContent = displayUrl;
+}
+
+export function showQrModal(svgHtml, url) {
+    showQrCode(svgHtml, url);
     document.getElementById('qr-modal').style.display = 'flex';
 }
 

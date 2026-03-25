@@ -152,7 +152,10 @@
                 <p class="card-desc">Choose a password to protect your clipboard. You will need it on every device.</p>
                 <div class="form-group">
                     <label for="create-password">Password</label>
-                    <input type="password" id="create-password" placeholder="Enter a strong password" autocomplete="off">
+                    <div class="password-input-row">
+                        <input type="password" id="create-password" placeholder="Enter a strong password" autocomplete="off">
+                        <button type="button" id="btn-generate-password" class="btn btn-small btn-generate" title="Generate random password">Generate</button>
+                    </div>
                     <div id="password-strength" class="password-strength" style="display:none">
                         <div class="strength-bar">
                             <div class="strength-segment"></div>
@@ -280,7 +283,14 @@
                 <div id="qr-code" class="qr-container"></div>
                 <p id="qr-url" class="qr-url"></p>
                 <button id="btn-qr-copy" class="btn btn-secondary btn-full">Copy Link</button>
-                <p class="qr-note">Password is not included in the link. It must be entered manually on the other device.</p>
+                <div class="qr-trusted-option">
+                    <label class="qr-trusted-label">
+                        <input type="checkbox" id="qr-trusted-device">
+                        <span>I trust the device that will scan this QR code</span>
+                    </label>
+                    <p id="qr-trusted-hint" class="qr-trusted-hint">When enabled, the QR code will include the password so the other device can open the clipboard directly. Only use this if you fully trust the scanning device.</p>
+                </div>
+                <p id="qr-note" class="qr-note">Password is not included in the link. It must be entered manually on the other device.</p>
             </div>
         </div>
     </div>

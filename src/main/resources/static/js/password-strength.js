@@ -65,6 +65,24 @@ export function evaluate(password) {
 }
 
 /**
+ * Reset the strength indicator to its initial hidden state.
+ * Call this when the create form is re-entered to clear stale UI.
+ * @param {string} containerId - ID of the indicator container
+ */
+export function reset(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.style.display = 'none';
+    const segments = container.querySelectorAll('.strength-segment');
+    segments.forEach(seg => seg.className = 'strength-segment');
+    const label = container.querySelector('.strength-label');
+    if (label) { label.textContent = ''; label.className = 'strength-label'; }
+    const hints = container.querySelector('.strength-hints');
+    if (hints) { hints.innerHTML = ''; hints.style.display = 'none'; }
+}
+
+/**
  * Bind the strength indicator to a password input.
  * @param {string} inputId - ID of the password input element
  * @param {string} containerId - ID of the indicator container
