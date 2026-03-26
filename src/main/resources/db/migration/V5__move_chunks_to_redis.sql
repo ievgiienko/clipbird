@@ -5,3 +5,4 @@
 
 ALTER TABLE chunk_transfers DROP COLUMN temp_chunk_data;
 ALTER TABLE chunk_transfers DROP COLUMN temp_chunk_iv;
+

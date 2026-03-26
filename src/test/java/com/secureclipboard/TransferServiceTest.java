@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.socket.WebSocketSession;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -235,6 +236,62 @@ class TransferServiceTest {
         // No chunk uploaded yet
         assertThrows(IllegalStateException.class, () ->
             transferService.downloadChunk(transfer.transferCode(), 0));
+    }
+
+    @Test
+    void shouldCancelActiveTransfersWhenSourceDisconnects() {
+        TransferResponse transfer = transferService.createTransfer(
+            new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+
+        // Upload a chunk so transfer is in CHUNK_READY state
+        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{1}, "iv-0", "h0");
+
+        // Simulate source disconnect: cancel all active transfers for this source
+        List<TransferResponse> cancelled = transferService.failTransfersBySourceDevice("source-device");
+        assertEquals(1, cancelled.size());
+        assertEquals("CANCELLED", cancelled.get(0).status());
+        assertEquals(transfer.transferCode(), cancelled.get(0).transferCode());
+
+        // Verify transfer is actually cancelled in the DB
+        TransferResponse afterCancel = transferService.getTransfer(transfer.transferCode());
+        assertEquals("CANCELLED", afterCancel.status());
+
+        // Verify further uploads are rejected
+        assertThrows(IllegalStateException.class, () ->
+            transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{2}, "iv-1", "h1"));
+    }
+
+    @Test
+    void shouldCancelActiveTransfersWhenFileRemoved() {
+        TransferResponse transfer = transferService.createTransfer(
+            new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+
+        List<TransferResponse> cancelled = transferService.failTransfersByFile(fileCode);
+        assertEquals(1, cancelled.size());
+        assertEquals("CANCELLED", cancelled.get(0).status());
+
+        TransferResponse afterCancel = transferService.getTransfer(transfer.transferCode());
+        assertEquals("CANCELLED", afterCancel.status());
+    }
+
+    @Test
+    void shouldNotCancelAlreadyCompletedTransfers() {
+        TransferResponse transfer = transferService.createTransfer(
+            new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+
+        // Complete the transfer
+        for (int i = 0; i < 3; i++) {
+            transferService.uploadChunk(transfer.transferCode(), i, new byte[]{(byte) i}, "iv-" + i, "h" + i);
+            transferService.acknowledgeChunk(transfer.transferCode());
+        }
+
+        // failTransfersBySourceDevice should NOT affect the completed transfer
+        List<TransferResponse> cancelled = transferService.failTransfersBySourceDevice("source-device");
+        assertTrue(cancelled.stream().noneMatch(t -> t.transferCode().equals(transfer.transferCode())),
+            "Completed transfer should not be in the cancelled list");
+
+        TransferResponse afterCheck = transferService.getTransfer(transfer.transferCode());
+        assertEquals("COMPLETED", afterCheck.status());
     }
 
     @Test

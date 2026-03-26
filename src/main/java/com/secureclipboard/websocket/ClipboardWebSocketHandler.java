@@ -18,6 +18,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -82,6 +83,21 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
         sessionManager.leave(session);
 
         if (clipboardCode != null && deviceId != null) {
+            // Cancel all active transfers where this device is the source
+            // and notify target devices immediately
+            try {
+                List<TransferResponse> cancelled = transferService.failTransfersBySourceDevice(deviceId);
+                for (TransferResponse t : cancelled) {
+                    ObjectNode msg = objectMapper.createObjectNode();
+                    msg.put("type", "transfer_cancelled");
+                    msg.put("transferCode", t.transferCode());
+                    msg.put("reason", "Source device disconnected");
+                    broadcastToRoom(clipboardCode, msg.toString(), session);
+                }
+            } catch (Exception e) {
+                log.error("Failed to cancel transfers for disconnected device {}", deviceId, e);
+            }
+
             broadcastToRoom(clipboardCode, createDeviceEvent("device_left", deviceId, clipboardCode), session);
         }
     }
@@ -165,9 +181,25 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
         String clipboardCode = sessionManager.getClipboardCode(session);
         if (clipboardCode == null) return;
 
+        String fileCode = payload.path("fileCode").asText();
+
+        // Cancel all active transfers for this file and notify downloaders
+        try {
+            List<TransferResponse> cancelled = transferService.failTransfersByFile(fileCode);
+            for (TransferResponse t : cancelled) {
+                ObjectNode cancelMsg = objectMapper.createObjectNode();
+                cancelMsg.put("type", "transfer_cancelled");
+                cancelMsg.put("transferCode", t.transferCode());
+                cancelMsg.put("reason", "File was removed by the sender");
+                broadcastToRoom(clipboardCode, cancelMsg.toString(), null);
+            }
+        } catch (Exception e) {
+            log.error("Failed to cancel transfers for removed file {}", fileCode, e);
+        }
+
         ObjectNode msg = objectMapper.createObjectNode();
         msg.put("type", "file_removed");
-        msg.put("fileCode", payload.path("fileCode").asText());
+        msg.put("fileCode", fileCode);
         broadcastToRoom(clipboardCode, msg.toString(), session);
     }
 
@@ -213,7 +245,17 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
             }
             sendMessage(sourceSession, msg.toString());
         } else {
-            sendError(session, "Source device is offline");
+            // Source is offline — cancel the transfer and notify the target
+            try {
+                transferService.cancelTransfer(transferCode);
+            } catch (Exception e) {
+                log.warn("Failed to cancel transfer {} for offline source", transferCode, e);
+            }
+            ObjectNode cancelMsg = objectMapper.createObjectNode();
+            cancelMsg.put("type", "transfer_cancelled");
+            cancelMsg.put("transferCode", transferCode);
+            cancelMsg.put("reason", "Source device is no longer available");
+            sendMessage(session, cancelMsg.toString());
         }
     }
 
@@ -282,6 +324,18 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
                         msg.put("byteOffset", byteOffset);
                     }
                     sendMessage(sourceSession, msg.toString());
+                } else {
+                    // Source went offline mid-transfer — cancel and notify target
+                    try {
+                        transferService.cancelTransfer(transferCode);
+                    } catch (Exception e) {
+                        log.warn("Failed to cancel transfer {} for offline source", transferCode, e);
+                    }
+                    ObjectNode cancelMsg = objectMapper.createObjectNode();
+                    cancelMsg.put("type", "transfer_cancelled");
+                    cancelMsg.put("transferCode", transferCode);
+                    cancelMsg.put("reason", "Source device is no longer available");
+                    sendMessage(session, cancelMsg.toString());
                 }
             }
         }

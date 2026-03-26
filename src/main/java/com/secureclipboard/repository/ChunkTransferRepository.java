@@ -19,4 +19,8 @@ public interface ChunkTransferRepository extends JpaRepository<ChunkTransfer, Lo
     List<ChunkTransfer> findByStatusInAndExpiresAtBefore(List<TransferStatus> statuses, Instant now);
 
     void deleteByClipboardId(Long clipboardId);
+
+    List<ChunkTransfer> findBySourceDeviceIdAndStatusIn(String sourceDeviceId, List<TransferStatus> statuses);
+
+    List<ChunkTransfer> findByFileFileCodeAndStatusIn(String fileCode, List<TransferStatus> statuses);
 }

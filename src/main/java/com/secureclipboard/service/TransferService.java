@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 /**
  * Manages chunk-based file transfers with a simple sequential model.
@@ -175,6 +176,50 @@ public class TransferService {
     @Transactional(readOnly = true)
     public TransferResponse getTransfer(String transferCode) {
         return toResponse(findTransfer(transferCode));
+    }
+
+    /**
+     * Cancel all active transfers where the given device is the source.
+     * Called when a device disconnects or goes offline.
+     * Returns the list of cancelled transfers for notification purposes.
+     */
+    @Transactional
+    public List<TransferResponse> failTransfersBySourceDevice(String sourceDeviceId) {
+        List<TransferStatus> activeStatuses = List.of(
+            TransferStatus.PENDING, TransferStatus.AWAITING_CHUNK,
+            TransferStatus.CHUNK_READY, TransferStatus.IN_PROGRESS
+        );
+        List<ChunkTransfer> transfers = transferRepo.findBySourceDeviceIdAndStatusIn(sourceDeviceId, activeStatuses);
+        return transfers.stream().map(t -> {
+            t.setStatus(TransferStatus.CANCELLED);
+            t.setTempChunkNo(null);
+            transferRepo.save(t);
+            chunkStore.deleteAll(t.getTransferCode());
+            log.info("Transfer {} cancelled: source device {} went offline", t.getTransferCode(), sourceDeviceId);
+            return toResponse(t);
+        }).toList();
+    }
+
+    /**
+     * Cancel all active transfers for a specific file.
+     * Called when a file is removed by its owner.
+     * Returns the list of cancelled transfers for notification purposes.
+     */
+    @Transactional
+    public List<TransferResponse> failTransfersByFile(String fileCode) {
+        List<TransferStatus> activeStatuses = List.of(
+            TransferStatus.PENDING, TransferStatus.AWAITING_CHUNK,
+            TransferStatus.CHUNK_READY, TransferStatus.IN_PROGRESS
+        );
+        List<ChunkTransfer> transfers = transferRepo.findByFileFileCodeAndStatusIn(fileCode, activeStatuses);
+        return transfers.stream().map(t -> {
+            t.setStatus(TransferStatus.CANCELLED);
+            t.setTempChunkNo(null);
+            transferRepo.save(t);
+            chunkStore.deleteAll(t.getTransferCode());
+            log.info("Transfer {} cancelled: file {} was removed", t.getTransferCode(), fileCode);
+            return toResponse(t);
+        }).toList();
     }
 
     private ChunkTransfer findTransfer(String transferCode) {
