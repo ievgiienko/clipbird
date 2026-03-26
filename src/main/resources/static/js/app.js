@@ -429,10 +429,22 @@ function setupWsHandlers(ws) {
         refreshFileList();
     });
 
-    ws.on('device_left', (msg) => {
+    ws.on('device_left', async (msg) => {
         setState({ connectedDevices: msg.connectedDevices });
         ui.setDeviceCount(msg.connectedDevices);
         refreshFileList();
+
+        // Server sends transfer_cancelled for active transfers when source disconnects,
+        // but also clean up source-side state for transfers we were uploading to the
+        // now-disconnected target device.
+        const state = getState();
+        for (const [code, transfer] of state.activeTransfers) {
+            if (transfer.direction === 'upload' && transfer.targetDeviceId === msg.deviceId) {
+                sourceTransfers.delete(code);
+                state.activeTransfers.delete(code);
+            }
+        }
+        if (state.activeTransfers.size >= 0) ui.renderTransfers(state.activeTransfers);
     });
 
     ws.on('text_updated', async (msg) => {
@@ -460,11 +472,24 @@ function setupWsHandlers(ws) {
         updateDownloadAllButton();
     });
 
-    ws.on('file_removed', (msg) => {
+    ws.on('file_removed', async (msg) => {
         const state = getState();
         state.files = state.files.filter(f => f.fileCode !== msg.fileCode);
         ui.renderFileList(state.files);
         updateDownloadAllButton();
+
+        // Abort any active downloads for this file (server also sends transfer_cancelled,
+        // but this provides immediate client-side cleanup before the message arrives)
+        for (const [code, transfer] of state.activeTransfers) {
+            if (transfer.fileCode === msg.fileCode && transfer.direction === 'download') {
+                if (transfer.writer) {
+                    try { await transfer.writer.cleanup(); } catch { /* ignore */ }
+                }
+                state.activeTransfers.delete(code);
+                onBatchTransferCompleted(code, false);
+            }
+        }
+        ui.renderTransfers(state.activeTransfers);
     });
 
     ws.on('clipboard_deleted', () => {
@@ -902,8 +927,17 @@ async function handleChunkReady(msg) {
         ws.send({ type: 'chunk_ack', transferCode, chunkNo, chunkSize: transfer.chunkSize, byteOffset: transfer.nextByteOffset });
     } catch (err) {
         console.error('Failed to download chunk:', err);
-        transfer.status = 'Error: ' + err.message;
+        // Auto-cancel the stuck transfer and clean up
+        try {
+            ws.send({ type: 'transfer_cancel', transferCode });
+        } catch { /* ws may be closed */ }
+        if (transfer.writer) {
+            try { await transfer.writer.cleanup(); } catch { /* ignore */ }
+        }
+        state.activeTransfers.delete(transferCode);
         ui.renderTransfers(state.activeTransfers);
+        onBatchTransferCompleted(transferCode, false);
+        ui.showError('clipboard-error', 'Download failed: ' + err.message);
     }
 }
 
@@ -973,7 +1007,12 @@ async function handleTransferCancelled(msg) {
     state.activeTransfers.delete(msg.transferCode);
     ui.renderTransfers(state.activeTransfers);
     onBatchTransferCompleted(msg.transferCode, false);
-    if (!batchDownload || !batchDownload.active) {
+
+    // Show reason-specific message
+    const reason = msg.reason;
+    if (reason) {
+        ui.showError('clipboard-error', reason);
+    } else if (!batchDownload || !batchDownload.active) {
         ui.showInfo('Transfer cancelled');
     }
 }

@@ -16,7 +16,7 @@
  *  - Chrome extension requests
  */
 
-const CACHE_NAME = 'clipbird-shell-v3';
+const CACHE_NAME = 'clipbird-shell-v4';
 
 const SHELL_ASSETS = [
   '/',
