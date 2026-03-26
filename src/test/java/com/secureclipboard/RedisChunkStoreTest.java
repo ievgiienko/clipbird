@@ -23,7 +23,7 @@ class RedisChunkStoreTest {
     @Test
     void shouldStoreAndRetrieveChunk() {
         byte[] data = new byte[]{1, 2, 3, 4, 5};
-        chunkStore.store("transfer-1", 0, data, "iv-test");
+        chunkStore.store("transfer-1", 0, data, "iv-test", "hash-test");
 
         assertTrue(chunkStore.exists("transfer-1", 0));
         assertArrayEquals(data, chunkStore.getData("transfer-1", 0));
@@ -39,7 +39,7 @@ class RedisChunkStoreTest {
 
     @Test
     void shouldDeleteChunk() {
-        chunkStore.store("transfer-2", 0, new byte[]{10}, "iv-0");
+        chunkStore.store("transfer-2", 0, new byte[]{10}, "iv-0", "hash-0");
         assertTrue(chunkStore.exists("transfer-2", 0));
 
         chunkStore.delete("transfer-2", 0);
@@ -49,9 +49,9 @@ class RedisChunkStoreTest {
 
     @Test
     void shouldDeleteAllChunksForTransfer() {
-        chunkStore.store("transfer-3", 0, new byte[]{1}, "iv-0");
-        chunkStore.store("transfer-3", 1, new byte[]{2}, "iv-1");
-        chunkStore.store("transfer-3", 2, new byte[]{3}, "iv-2");
+        chunkStore.store("transfer-3", 0, new byte[]{1}, "iv-0", "h0");
+        chunkStore.store("transfer-3", 1, new byte[]{2}, "iv-1", "h1");
+        chunkStore.store("transfer-3", 2, new byte[]{3}, "iv-2", "h2");
 
         chunkStore.deleteAll("transfer-3");
 
@@ -68,7 +68,7 @@ class RedisChunkStoreTest {
             binaryData[i] = (byte) i;
         }
 
-        chunkStore.store("transfer-binary", 0, binaryData, "iv-binary");
+        chunkStore.store("transfer-binary", 0, binaryData, "iv-binary", "hash-binary");
 
         byte[] retrieved = chunkStore.getData("transfer-binary", 0);
         assertArrayEquals(binaryData, retrieved);

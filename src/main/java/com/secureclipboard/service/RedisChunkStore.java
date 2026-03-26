@@ -30,14 +30,18 @@ public class RedisChunkStore {
     }
 
     /**
-     * Store an encrypted chunk with its IV. Both keys expire after CHUNK_TTL.
+     * Store an encrypted chunk with its IV and plaintext hash. All keys expire after CHUNK_TTL.
      */
-    public void store(String transferCode, int chunkNo, byte[] data, String iv) {
+    public void store(String transferCode, int chunkNo, byte[] data, String iv, String hash) {
         String dataKey = dataKey(transferCode, chunkNo);
         String ivKey = ivKey(transferCode, chunkNo);
 
         redisTemplate.opsForValue().set(dataKey, data, CHUNK_TTL);
         redisTemplate.opsForValue().set(ivKey, iv.getBytes(), CHUNK_TTL);
+
+        if (hash != null) {
+            redisTemplate.opsForValue().set(hashKey(transferCode, chunkNo), hash.getBytes(), CHUNK_TTL);
+        }
 
         log.debug("Stored chunk {} for transfer {} ({} bytes)", chunkNo, transferCode, data.length);
     }
@@ -58,6 +62,14 @@ public class RedisChunkStore {
     }
 
     /**
+     * Retrieve plaintext chunk hash. Returns null if not present or expired.
+     */
+    public String getHash(String transferCode, int chunkNo) {
+        byte[] hashBytes = redisTemplate.opsForValue().get(hashKey(transferCode, chunkNo));
+        return hashBytes != null ? new String(hashBytes) : null;
+    }
+
+    /**
      * Check if a chunk exists in the store.
      */
     public boolean exists(String transferCode, int chunkNo) {
@@ -65,11 +77,12 @@ public class RedisChunkStore {
     }
 
     /**
-     * Delete a specific chunk and its IV.
+     * Delete a specific chunk, its IV, and its hash.
      */
     public void delete(String transferCode, int chunkNo) {
         redisTemplate.delete(dataKey(transferCode, chunkNo));
         redisTemplate.delete(ivKey(transferCode, chunkNo));
+        redisTemplate.delete(hashKey(transferCode, chunkNo));
         log.debug("Deleted chunk {} for transfer {}", chunkNo, transferCode);
     }
 
@@ -92,5 +105,9 @@ public class RedisChunkStore {
 
     private String ivKey(String transferCode, int chunkNo) {
         return KEY_PREFIX + transferCode + ":" + chunkNo + ":iv";
+    }
+
+    private String hashKey(String transferCode, int chunkNo) {
+        return KEY_PREFIX + transferCode + ":" + chunkNo + ":hash";
     }
 }

@@ -74,11 +74,13 @@ export async function getTransfer(transferCode) {
  * @param {number} chunkNo
  * @param {ArrayBuffer} data - raw encrypted bytes
  * @param {string} iv - base64-encoded IV string
+ * @param {string} hash - hex-encoded SHA-256 hash of the plaintext chunk
  */
-export async function uploadChunk(transferCode, chunkNo, data, iv) {
+export async function uploadChunk(transferCode, chunkNo, data, iv, hash) {
     const formData = new FormData();
     formData.append('data', new Blob([data], { type: 'application/octet-stream' }), 'chunk');
     formData.append('iv', iv);
+    formData.append('hash', hash);
 
     const res = await fetch(`${BASE_URL}/transfers/${transferCode}/chunks/${chunkNo}`, {
         method: 'PUT',
@@ -107,8 +109,9 @@ export async function downloadChunk(transferCode, chunkNo) {
     const iv = res.headers.get('X-Chunk-IV');
     const lastChunk = res.headers.get('X-Last-Chunk') === 'true';
     const returnedChunkNo = parseInt(res.headers.get('X-Chunk-No') || chunkNo, 10);
+    const chunkHash = res.headers.get('X-Chunk-Hash');
 
-    return { data, iv, lastChunk, chunkNo: returnedChunkNo };
+    return { data, iv, lastChunk, chunkNo: returnedChunkNo, chunkHash };
 }
 
 export async function acknowledgeChunk(transferCode) {

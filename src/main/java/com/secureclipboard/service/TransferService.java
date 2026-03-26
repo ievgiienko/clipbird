@@ -89,7 +89,7 @@ public class TransferService {
      * Binary data is stored directly (no base64 conversion).
      */
     @Transactional
-    public void uploadChunk(String transferCode, int chunkNo, byte[] data, String iv) {
+    public void uploadChunk(String transferCode, int chunkNo, byte[] data, String iv, String hash) {
         ChunkTransfer transfer = findTransfer(transferCode);
         validateTransferActive(transfer);
 
@@ -97,7 +97,7 @@ public class TransferService {
             throw new IllegalStateException("Chunk buffer slot is full. Wait for target to download.");
         }
 
-        chunkStore.store(transferCode, chunkNo, data, iv);
+        chunkStore.store(transferCode, chunkNo, data, iv, hash);
         transfer.setTempChunkNo(chunkNo);
         transfer.setStatus(TransferStatus.CHUNK_READY);
         transferRepo.save(transfer);
@@ -127,8 +127,9 @@ public class TransferService {
         }
 
         String iv = chunkStore.getIv(transferCode, chunkNo);
+        String hash = chunkStore.getHash(transferCode, chunkNo);
         boolean lastChunk = (chunkNo >= transfer.getTotalChunks() - 1);
-        return new ChunkDownloadResponse(chunkNo, data, iv, lastChunk);
+        return new ChunkDownloadResponse(chunkNo, data, iv, hash, lastChunk);
     }
 
     /**

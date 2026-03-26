@@ -44,8 +44,10 @@ public class TransferController {
     public ResponseEntity<Void> uploadChunk(@PathVariable String transferCode,
                                              @PathVariable int chunkNo,
                                              @RequestPart("data") MultipartFile data,
-                                             @RequestPart("iv") String iv) throws IOException {
-        transferService.uploadChunk(transferCode, chunkNo, data.getBytes(), iv.trim());
+                                             @RequestPart("iv") String iv,
+                                             @RequestPart(value = "hash", required = false) String hash) throws IOException {
+        transferService.uploadChunk(transferCode, chunkNo, data.getBytes(), iv.trim(),
+            hash != null ? hash.trim() : null);
         return ResponseEntity.ok().build();
     }
 
@@ -63,6 +65,9 @@ public class TransferController {
         headers.set("X-Chunk-IV", chunk.iv());
         headers.set("X-Last-Chunk", String.valueOf(chunk.lastChunk()));
         headers.set("X-Chunk-No", String.valueOf(chunk.chunkNo()));
+        if (chunk.chunkHash() != null) {
+            headers.set("X-Chunk-Hash", chunk.chunkHash());
+        }
         return ResponseEntity.ok().headers(headers).body(chunk.data());
     }
 
