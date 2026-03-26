@@ -233,6 +233,11 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
             msg.put("type", "chunk_ready");
             msg.put("transferCode", transferCode);
             msg.put("chunkNo", payload.path("chunkNo").asInt());
+            // Relay file-level hash-of-hashes (sent by source on last chunk)
+            String fileHash = payload.path("fileHash").asText(null);
+            if (fileHash != null) {
+                msg.put("fileHash", fileHash);
+            }
             sendMessage(targetSession, msg.toString());
         }
     }

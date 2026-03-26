@@ -193,53 +193,25 @@ export function generateSalt() {
 }
 
 /**
- * Compute SHA-256 hash of a File object.
- * Reads the file in chunks to avoid loading the entire file into memory at once.
+ * Compute SHA-256 hash of a single chunk (ArrayBuffer).
+ * Uses native Web Crypto — constant memory, no streaming needed.
  * Returns hex-encoded hash string.
  */
-export async function computeFileHash(file) {
-    const HASH_CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB read chunks
-    const totalSize = file.size;
-
-    // For small files, hash in one shot
-    if (totalSize <= HASH_CHUNK_SIZE) {
-        const buffer = await file.arrayBuffer();
-        const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-        return bufferToHex(hashBuffer);
-    }
-
-    // For large files, read in chunks — but Web Crypto digest() doesn't support
-    // incremental updates, so we must read the whole file into memory.
-    // We read chunk-by-chunk to avoid blocking the main thread too long.
-    const chunks = [];
-    let offset = 0;
-    while (offset < totalSize) {
-        const end = Math.min(offset + HASH_CHUNK_SIZE, totalSize);
-        const blob = file.slice(offset, end);
-        const buffer = await blob.arrayBuffer();
-        chunks.push(new Uint8Array(buffer));
-        offset = end;
-    }
-
-    // Concatenate all chunks
-    const fullBuffer = new Uint8Array(totalSize);
-    let pos = 0;
-    for (const chunk of chunks) {
-        fullBuffer.set(chunk, pos);
-        pos += chunk.length;
-    }
-
-    const hashBuffer = await crypto.subtle.digest('SHA-256', fullBuffer);
+export async function computeChunkHash(chunkBuffer) {
+    const hashBuffer = await crypto.subtle.digest('SHA-256', chunkBuffer);
     return bufferToHex(hashBuffer);
 }
 
 /**
- * Compute SHA-256 hash of a Blob (for verifying reconstructed files on target side).
+ * Compute a file-level integrity hash from an ordered array of per-chunk hex hashes.
+ * Concatenates all chunk hashes and computes SHA-256 of the result.
+ * Memory: O(N * 64 chars) where N = number of chunks — trivial even for millions of chunks.
  * Returns hex-encoded hash string.
  */
-export async function computeBlobHash(blob) {
-    const buffer = await blob.arrayBuffer();
-    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+export async function computeHashOfHashes(chunkHexHashes) {
+    const combined = chunkHexHashes.join('');
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(combined));
     return bufferToHex(hashBuffer);
 }
 

@@ -99,7 +99,7 @@ class TransferServiceTest {
             new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
 
         byte[] data = new byte[]{1, 2, 3, 4, 5};
-        transferService.uploadChunk(transfer.transferCode(), 0, data, "test-iv-0");
+        transferService.uploadChunk(transfer.transferCode(), 0, data, "test-iv-0", "hash-0");
 
         ChunkDownloadResponse chunk = transferService.downloadChunk(transfer.transferCode(), 0);
         assertArrayEquals(data, chunk.data());
@@ -113,11 +113,11 @@ class TransferServiceTest {
         TransferResponse transfer = transferService.createTransfer(
             new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
 
-        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0");
+        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0", "h0");
 
         // Second upload should fail — slot is full
         assertThrows(IllegalStateException.class, () ->
-            transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1"));
+            transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1", "h1"));
     }
 
     @Test
@@ -125,7 +125,7 @@ class TransferServiceTest {
         TransferResponse transfer = transferService.createTransfer(
             new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
 
-        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0");
+        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0", "h0");
 
         // ACK chunk 0
         TransferResponse afterAck = transferService.acknowledgeChunk(transfer.transferCode());
@@ -133,7 +133,7 @@ class TransferServiceTest {
         assertEquals("AWAITING_CHUNK", afterAck.status());
 
         // Now we can upload chunk 1 (slot freed by ack)
-        transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1");
+        transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1", "h1");
     }
 
     @Test
@@ -142,15 +142,15 @@ class TransferServiceTest {
             new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
 
         // Upload and ack all 3 chunks sequentially
-        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0");
+        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0", "h0");
         TransferResponse r1 = transferService.acknowledgeChunk(transfer.transferCode());
         assertEquals("AWAITING_CHUNK", r1.status());
 
-        transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1");
+        transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1", "h1");
         TransferResponse r2 = transferService.acknowledgeChunk(transfer.transferCode());
         assertEquals("AWAITING_CHUNK", r2.status());
 
-        transferService.uploadChunk(transfer.transferCode(), 2, new byte[]{30}, "iv-2");
+        transferService.uploadChunk(transfer.transferCode(), 2, new byte[]{30}, "iv-2", "h2");
         TransferResponse r3 = transferService.acknowledgeChunk(transfer.transferCode());
         assertEquals("COMPLETED", r3.status());
         assertEquals(3, r3.currentChunkNo());
@@ -161,7 +161,7 @@ class TransferServiceTest {
         TransferResponse transfer = transferService.createTransfer(
             new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
 
-        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0");
+        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0", "h0");
 
         transferService.cancelTransfer(transfer.transferCode());
 
@@ -170,7 +170,7 @@ class TransferServiceTest {
 
         // Verify data is cleared by checking uploads fail (transfer is cancelled)
         assertThrows(IllegalStateException.class, () ->
-            transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1"));
+            transferService.uploadChunk(transfer.transferCode(), 1, new byte[]{20}, "iv-1", "h1"));
     }
 
     @Test
@@ -178,7 +178,7 @@ class TransferServiceTest {
         TransferResponse transfer = transferService.createTransfer(
             new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
 
-        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0");
+        transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{10}, "iv-0", "h0");
 
         // Request chunk 1, which isn't buffered
         assertThrows(IllegalArgumentException.class, () ->
@@ -196,7 +196,7 @@ class TransferServiceTest {
             binaryData[i] = (byte) i;
         }
 
-        transferService.uploadChunk(transfer.transferCode(), 0, binaryData, "iv-binary");
+        transferService.uploadChunk(transfer.transferCode(), 0, binaryData, "iv-binary", "hash-bin");
 
         ChunkDownloadResponse chunk = transferService.downloadChunk(transfer.transferCode(), 0);
         assertArrayEquals(binaryData, chunk.data());
@@ -214,7 +214,7 @@ class TransferServiceTest {
         transferRepository.save(entity);
 
         assertThrows(IllegalStateException.class, () ->
-            transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{1}, "iv"));
+            transferService.uploadChunk(transfer.transferCode(), 0, new byte[]{1}, "iv", "h"));
     }
 
     @Test
@@ -245,7 +245,7 @@ class TransferServiceTest {
         // Simulate full sequential transfer: upload -> download -> ack for each chunk
         for (int i = 0; i < 3; i++) {
             byte[] data = new byte[]{(byte) (i * 10)};
-            transferService.uploadChunk(transfer.transferCode(), i, data, "iv-" + i);
+            transferService.uploadChunk(transfer.transferCode(), i, data, "iv-" + i, "hash-" + i);
 
             ChunkDownloadResponse chunk = transferService.downloadChunk(transfer.transferCode(), i);
             assertArrayEquals(data, chunk.data());

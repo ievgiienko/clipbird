@@ -8,5 +8,6 @@ public record ChunkDownloadResponse(
     int chunkNo,
     byte[] data,
     String iv,
+    String chunkHash,
     boolean lastChunk
 ) {}

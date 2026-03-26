@@ -53,7 +53,9 @@
       "Bash(mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args=\"install chromium\")",
       "Bash(mvn dependency:copy-dependencies -DincludeArtifactIds=playwright -DincludeScope=test -DoutputDirectory=target/playwright-deps)",
       "Bash(mvn dependency:copy-dependencies -DincludeScope=test -DoutputDirectory=target/playwright-deps)",
-      "Bash(mvn test-compile:*)"
+      "Bash(mvn test-compile:*)",
+      "Bash(mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args=\"install\")",
+      "Bash(mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args=\"install\" -D exec.classpathScope=test)"
     ]
   }
 }

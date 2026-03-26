@@ -19,6 +19,7 @@ import { generateQR, toSvg } from './qr.js';
 import * as passwordStrength from './password-strength.js';
 import { initTheme } from './theme.js';
 import { initPwa } from './pwa.js';
+import * as fileWriter from './file-writer.js';
 
 const CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB default
 const TEXT_DEBOUNCE_MS = 500;
@@ -35,6 +36,7 @@ let ws = null;
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     initPwa();
+    fileWriter.cleanupOrphans();
     setState({ deviceId: generateDeviceId() });
     bindEvents();
     passwordStrength.bind('create-password', 'password-strength');
@@ -528,14 +530,12 @@ async function processFiles(files) {
         try {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-            // Compute SHA-256 hash of the original plaintext file for integrity verification
-            const fileHash = await crypto.computeFileHash(file);
-
             const encName = await crypto.encryptString(state.cryptoKey, file.name);
             const encMime = file.type
                 ? await crypto.encryptString(state.cryptoKey, file.type)
                 : { ciphertext: '', iv: '' };
 
+            // fileHash is computed incrementally during transfer (per-chunk hash-of-hashes)
             const manifest = await api.addFile(state.clipboardCode, {
                 encryptedName: encName.ciphertext,
                 encryptedNameIv: encName.iv,
@@ -544,7 +544,7 @@ async function processFiles(files) {
                 sizeBytes: file.size,
                 totalChunks,
                 sourceDeviceId: state.deviceId,
-                fileHash
+                fileHash: null
             });
 
             await fileStore.storeFile(manifest.fileCode, file);
@@ -698,12 +698,17 @@ async function startDownload(fileCode) {
             fileName = await crypto.decryptString(state.cryptoKey, file.encryptedName, file.encryptedNameIv);
         } catch { /* fallback */ }
 
+        // Create streaming file writer (OPFS or in-memory fallback)
+        const writer = await fileWriter.createWriter(transfer.transferCode, file.sizeBytes);
+
         state.activeTransfers.set(transfer.transferCode, {
             ...transfer,
             fileName,
             direction: 'download',
             currentChunk: 0,
-            chunks: [],
+            writer,
+            chunkHashes: [],
+            expectedFileHash: null,
             // Adaptive chunk size state
             chunkSize: transfer.defaultChunkSize || CHUNK_SIZE,
             minChunkSize: transfer.minChunkSize || MIN_CHUNK_SIZE,
@@ -750,10 +755,15 @@ function requestChunkFromSource(transferCode, fileCode, sourceDeviceId, chunkNo,
 // FILE UPLOAD (SOURCE DEVICE)
 // ============================================================
 
+// Source-side per-transfer state for incremental hash tracking.
+// Maps transferCode → { chunkHashes: string[], totalChunks: number }
+const sourceTransfers = new Map();
+
 /**
  * Handle server's request to upload a specific chunk.
  * Uses binary encryption (no base64) and binary upload.
- * The chunkSize may vary per-chunk due to adaptive sizing.
+ * Computes per-chunk SHA-256 hash of plaintext for integrity verification.
+ * On the last chunk, computes and sends the file-level hash-of-hashes.
  */
 async function handleSendChunkRequest(msg) {
     const state = getState();
@@ -761,26 +771,46 @@ async function handleSendChunkRequest(msg) {
 
     try {
         const file = state.files.find(f => f.fileCode === fileCode);
+        const totalChunks = file ? file.totalChunks : 1;
+
+        // Initialize per-transfer hash tracking
+        if (!sourceTransfers.has(transferCode)) {
+            sourceTransfers.set(transferCode, { chunkHashes: [], totalChunks });
+        }
+        const srcTransfer = sourceTransfers.get(transferCode);
+
         // Use the chunk size from the message (adaptive) or fall back to file/default
         const chunkSize = msg.chunkSize || (file ? file.chunkSize : CHUNK_SIZE);
         // Use explicit byteOffset if provided, otherwise fall back to chunkNo * chunkSize
         const byteOffset = msg.byteOffset != null ? msg.byteOffset : chunkNo * chunkSize;
         const chunkData = await fileStore.readChunk(fileCode, byteOffset, chunkSize);
 
+        // Compute per-chunk integrity hash on plaintext before encryption
+        const chunkHash = await crypto.computeChunkHash(chunkData);
+        srcTransfer.chunkHashes[chunkNo] = chunkHash;
+
         // Binary encryption: returns { data: ArrayBuffer, iv: Uint8Array }
         const encrypted = await crypto.encryptChunkBinary(state.cryptoKey, chunkData);
         // IV as base64 string for the header/form field
         const ivB64 = crypto.bytesToBase64(encrypted.iv);
-        await api.uploadChunk(transferCode, chunkNo, encrypted.data, ivB64);
+        await api.uploadChunk(transferCode, chunkNo, encrypted.data, ivB64, chunkHash);
 
         const transfer = await api.getTransfer(transferCode);
 
-        ws.send({
+        const uploadedMsg = {
             type: 'chunk_uploaded',
             transferCode,
             chunkNo,
             targetDeviceId: transfer.targetDeviceId
-        });
+        };
+
+        // On last chunk, compute file-level hash-of-hashes and include it
+        if (chunkNo === totalChunks - 1) {
+            uploadedMsg.fileHash = await crypto.computeHashOfHashes(srcTransfer.chunkHashes);
+            sourceTransfers.delete(transferCode);
+        }
+
+        ws.send(uploadedMsg);
     } catch (err) {
         console.error('Failed to send chunk:', err);
         ui.showError('clipboard-error', 'Failed to send file chunk: ' + err.message);
@@ -803,18 +833,38 @@ async function handleChunkReady(msg) {
     if (!transfer) return;
 
     // Guard against duplicate chunk_ready for same chunkNo
-    if (transfer.chunks[chunkNo]) return;
+    if (transfer._processedChunks && transfer._processedChunks.has(chunkNo)) return;
+
+    // Capture file-level hash-of-hashes if sent with last chunk
+    if (msg.fileHash) {
+        transfer.expectedFileHash = msg.fileHash;
+    }
 
     try {
-        // Binary download: returns { data: ArrayBuffer, iv: string (base64), lastChunk, chunkNo }
+        // Binary download: returns { data, iv, lastChunk, chunkNo, chunkHash }
         const chunk = await api.downloadChunk(transferCode, chunkNo);
         // Decrypt using binary path: convert IV from base64 to Uint8Array
         const ivBytes = crypto.base64ToBytes(chunk.iv);
         const decrypted = await crypto.decryptChunkBinary(state.cryptoKey, chunk.data, ivBytes);
-        transfer.chunks[chunkNo] = new Uint8Array(decrypted);
 
-        // Update progress: count filled chunk slots
-        const completedChunks = transfer.chunks.filter(c => c != null).length;
+        // Per-chunk integrity verification
+        if (chunk.chunkHash) {
+            const actualHash = await crypto.computeChunkHash(decrypted);
+            if (actualHash !== chunk.chunkHash) {
+                throw new Error(`Chunk ${chunkNo} integrity check failed`);
+            }
+            transfer.chunkHashes[chunkNo] = chunk.chunkHash;
+        }
+
+        // Mark chunk as processed (for duplicate guard)
+        if (!transfer._processedChunks) transfer._processedChunks = new Set();
+        transfer._processedChunks.add(chunkNo);
+
+        // Write decrypted chunk to OPFS/storage (constant memory)
+        await transfer.writer.writeChunk(decrypted);
+
+        // Update progress
+        const completedChunks = transfer._processedChunks.size;
         transfer.currentChunk = completedChunks;
         transfer.status = `${completedChunks}/${transfer.totalChunks}`;
         ui.renderTransfers(state.activeTransfers);
@@ -871,29 +921,19 @@ async function handleTransferComplete(msg) {
     }
 
     try {
-        // Reconstruct file from ordered chunks
-        const orderedChunks = [];
-        for (let i = 0; i < transfer.totalChunks; i++) {
-            if (!transfer.chunks[i]) {
-                throw new Error(`Missing chunk ${i}`);
-            }
-            orderedChunks.push(transfer.chunks[i]);
-        }
-
-        const blob = new Blob(orderedChunks);
-
-        // Verify file integrity if hash is available
-        const file = state.files.find(f => f.fileCode === transfer.fileCode);
-        const expectedHash = file && file.fileHash;
-        if (expectedHash) {
+        // Verify file-level integrity via hash-of-hashes (no full-file read needed)
+        if (transfer.expectedFileHash && transfer.chunkHashes.length > 0) {
             transfer.status = 'Verifying...';
             ui.renderTransfers(state.activeTransfers);
 
-            const actualHash = await crypto.computeBlobHash(blob);
-            if (actualHash !== expectedHash) {
+            const actualFileHash = await crypto.computeHashOfHashes(transfer.chunkHashes);
+            if (actualFileHash !== transfer.expectedFileHash) {
                 throw new Error('Integrity check failed: downloaded file does not match the original');
             }
         }
+
+        // Get assembled file from writer (OPFS File or in-memory Blob)
+        const blob = await transfer.writer.getFile();
 
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -902,7 +942,13 @@ async function handleTransferComplete(msg) {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+
+        // Revoke blob URL after a delay — the browser needs time to start the download.
+        // OPFS-backed Files become invalid if their temp file is deleted immediately.
+        setTimeout(() => {
+            URL.revokeObjectURL(url);
+            transfer.writer.cleanup();
+        }, 60_000);
 
         ui.showInfo(`File "${transfer.fileName}" downloaded successfully`);
         state.activeTransfers.delete(msg.transferCode);
@@ -910,14 +956,20 @@ async function handleTransferComplete(msg) {
         onBatchTransferCompleted(msg.transferCode, true);
     } catch (err) {
         ui.showError('clipboard-error', 'Failed to reconstruct file: ' + err.message);
+        if (transfer.writer) await transfer.writer.cleanup();
         state.activeTransfers.delete(msg.transferCode);
         ui.renderTransfers(state.activeTransfers);
         onBatchTransferCompleted(msg.transferCode, false);
     }
 }
 
-function handleTransferCancelled(msg) {
+async function handleTransferCancelled(msg) {
     const state = getState();
+    const transfer = state.activeTransfers.get(msg.transferCode);
+    if (transfer && transfer.writer) {
+        await transfer.writer.cleanup();
+    }
+    sourceTransfers.delete(msg.transferCode);
     state.activeTransfers.delete(msg.transferCode);
     ui.renderTransfers(state.activeTransfers);
     onBatchTransferCompleted(msg.transferCode, false);
