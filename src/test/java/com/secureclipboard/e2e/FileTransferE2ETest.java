@@ -216,6 +216,14 @@ class FileTransferE2ETest {
         transferSingleFile("test_50mb.bin", 50 * CHUNK_SIZE);
     }
 
+    @Test
+    @Order(12)
+    @DisplayName("150 MB file (150 chunks)")
+    @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    void transfer_150MB() throws Exception {
+        transferSingleFile("test_150mb.bin", 150 * CHUNK_SIZE);
+    }
+
     // ================================================================
     // Multi-file tests
     // ================================================================
@@ -442,6 +450,125 @@ class FileTransferE2ETest {
     // ================================================================
     // Resilience tests
     // ================================================================
+
+    @Test
+    @Order(35)
+    @DisplayName("Big file download succeeds while both devices delete other files in parallel")
+    @Timeout(value = 5, unit = TimeUnit.MINUTES)
+    void transfer_deleteFilesDuringDownload() throws Exception {
+        // Generate files: both devices will add multiple files, then start a big download
+        // while simultaneously deleting the other files
+        int bigFileSize = 10 * CHUNK_SIZE; // 10 MB — enough chunks to overlap with deletions
+        Path srcFile1 = TestFileGenerator.generate(tempDir, "src_big.bin", bigFileSize);
+        Path srcFile2 = TestFileGenerator.generate(tempDir, "src_small_1.bin", 1024);
+        Path srcFile3 = TestFileGenerator.generate(tempDir, "src_small_2.bin", 50 * 1024);
+        Path tgtFile1 = TestFileGenerator.generate(tempDir, "tgt_small_1.bin", 2048);
+        Path tgtFile2 = TestFileGenerator.generate(tempDir, "tgt_small_2.bin", 30 * 1024);
+
+        String expectedBigHash = TestFileGenerator.sha256(srcFile1);
+
+        BrowserContext srcCtx = browser.newContext();
+        BrowserContext tgtCtx = browser.newContext();
+        try {
+            Page src = srcCtx.newPage();
+            Page tgt = tgtCtx.newPage();
+
+            src.onConsoleMessage(msg -> {
+                if ("error".equals(msg.type()))
+                    System.err.println("[SRC] " + msg.text());
+            });
+            tgt.onConsoleMessage(msg -> {
+                if ("error".equals(msg.type()))
+                    System.err.println("[TGT] " + msg.text());
+            });
+
+            // Source: create clipboard
+            String code = ClipboardActions.createClipboard(src, baseUrl, PASSWORD);
+
+            // Target: join
+            ClipboardActions.openClipboard(tgt, baseUrl, code, PASSWORD);
+
+            // Source adds its files (big + 2 small)
+            src.setInputFiles("#file-input", new Path[]{srcFile1, srcFile2, srcFile3});
+
+            // Target adds its files (2 small)
+            tgt.setInputFiles("#file-input", new Path[]{tgtFile1, tgtFile2});
+
+            // Wait for both sides to see all 5 files
+            ClipboardActions.waitForFileCount(src, 5);
+            ClipboardActions.waitForFileCount(tgt, 5);
+
+            // Target: wait for download buttons for source's files (3 files from source)
+            ClipboardActions.waitForDownloadButtons(tgt, 3);
+
+            // Identify the big file's download button on target side
+            // The big file has the most chunks, so find the file item showing "10 chunk"
+            tgt.waitForFunction(
+                    "() => { const items = document.querySelectorAll('.file-item'); " +
+                    "for (const item of items) { " +
+                    "  const meta = item.querySelector('.file-meta'); " +
+                    "  if (meta && meta.textContent.includes('10 chunk')) return true; " +
+                    "} return false; }",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(15_000));
+
+            // Start downloading the big file
+            Download download = tgt.waitForDownload(
+                    new Page.WaitForDownloadOptions().setTimeout(300_000),
+                    () -> {
+                        // Click the download button on the file item that has "10 chunk" in its meta
+                        tgt.evaluate(
+                            "() => { const items = document.querySelectorAll('.file-item'); " +
+                            "for (const item of items) { " +
+                            "  const meta = item.querySelector('.file-meta'); " +
+                            "  if (meta && meta.textContent.includes('10 chunk')) { " +
+                            "    item.querySelector('button[data-action=\"download\"]').click(); " +
+                            "    return; " +
+                            "  } } }");
+
+                        // Wait for transfer to start (transfer section visible with at least 1 chunk)
+                        tgt.waitForFunction(
+                                "() => { const el = document.getElementById('transfer-section'); " +
+                                "return el && el.style.display === 'block'; }",
+                                null,
+                                new Page.WaitForFunctionOptions().setTimeout(30_000));
+
+                        // Now both devices delete their other files while transfer is ongoing
+                        // Source removes its 2 small files
+                        src.locator("button[data-action='remove']").first().click();
+                        src.waitForTimeout(500);
+                        // After first removal, there may still be another remove button
+                        if (src.locator("button[data-action='remove']").count() > 0) {
+                            src.locator("button[data-action='remove']").first().click();
+                        }
+
+                        // Target removes its 2 files
+                        tgt.locator("button[data-action='remove']").first().click();
+                        tgt.waitForTimeout(500);
+                        if (tgt.locator("button[data-action='remove']").count() > 0) {
+                            tgt.locator("button[data-action='remove']").first().click();
+                        }
+                    });
+
+            // Verify the big file transferred correctly despite parallel deletions
+            Path downloadedFile = download.path();
+            assertNotNull(downloadedFile, "Downloaded file path should not be null");
+            String actualHash = TestFileGenerator.sha256(downloadedFile);
+            assertEquals(expectedBigHash, actualHash,
+                    "Big file SHA-256 should match despite other files being deleted during transfer");
+
+            // Verify that the deleted files are actually gone from the UI
+            // Only the big file (from source, non-own on target) should remain — no download button
+            // since transfer is complete, and source should have 1 file left (the big one, shown as own)
+            src.waitForFunction(
+                    "() => document.querySelectorAll('.file-item').length <= 1",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(15_000));
+        } finally {
+            srcCtx.close();
+            tgtCtx.close();
+        }
+    }
 
     @Test
     @Order(40)
