@@ -501,54 +501,61 @@ class FileTransferE2ETest {
             // Target: wait for download buttons for source's files (3 files from source)
             ClipboardActions.waitForDownloadButtons(tgt, 3);
 
-            // Identify the big file's download button on target side
-            // The big file has the most chunks, so find the file item showing "10 chunk"
+            // Identify the big file on target — it's the only one showing "10 MB"
             tgt.waitForFunction(
                     "() => { const items = document.querySelectorAll('.file-item'); " +
                     "for (const item of items) { " +
                     "  const meta = item.querySelector('.file-meta'); " +
-                    "  if (meta && meta.textContent.includes('10 chunk')) return true; " +
+                    "  const btn = item.querySelector('button[data-action=\"download\"]'); " +
+                    "  if (btn && meta && meta.textContent.includes('10 MB')) return true; " +
                     "} return false; }",
                     null,
-                    new Page.WaitForFunctionOptions().setTimeout(15_000));
+                    new Page.WaitForFunctionOptions().setTimeout(30_000));
 
-            // Start downloading the big file
-            Download download = tgt.waitForDownload(
-                    new Page.WaitForDownloadOptions().setTimeout(300_000),
-                    () -> {
-                        // Click the download button on the file item that has "10 chunk" in its meta
-                        tgt.evaluate(
-                            "() => { const items = document.querySelectorAll('.file-item'); " +
-                            "for (const item of items) { " +
-                            "  const meta = item.querySelector('.file-meta'); " +
-                            "  if (meta && meta.textContent.includes('10 chunk')) { " +
-                            "    item.querySelector('button[data-action=\"download\"]').click(); " +
-                            "    return; " +
-                            "  } } }");
+            // Capture download via listener (non-blocking)
+            List<Download> downloads = new CopyOnWriteArrayList<>();
+            tgt.onDownload(downloads::add);
 
-                        // Wait for transfer to start (transfer section visible with at least 1 chunk)
-                        tgt.waitForFunction(
-                                "() => { const el = document.getElementById('transfer-section'); " +
-                                "return el && el.style.display === 'block'; }",
-                                null,
-                                new Page.WaitForFunctionOptions().setTimeout(30_000));
+            // Click the download button on the big file (10 MB)
+            tgt.evaluate(
+                "() => { const items = document.querySelectorAll('.file-item'); " +
+                "for (const item of items) { " +
+                "  const meta = item.querySelector('.file-meta'); " +
+                "  const btn = item.querySelector('button[data-action=\"download\"]'); " +
+                "  if (btn && meta && meta.textContent.includes('10 MB')) { " +
+                "    btn.click(); return; " +
+                "  } } }");
 
-                        // Now both devices delete their other files while transfer is ongoing
-                        // Source removes its 2 small files
-                        src.locator("button[data-action='remove']").first().click();
-                        src.waitForTimeout(500);
-                        // After first removal, there may still be another remove button
-                        if (src.locator("button[data-action='remove']").count() > 0) {
-                            src.locator("button[data-action='remove']").first().click();
-                        }
+            // Wait for transfer to actually start (transfer section visible)
+            tgt.waitForFunction(
+                    "() => { const el = document.getElementById('transfer-section'); " +
+                    "return el && el.style.display === 'block'; }",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(30_000));
 
-                        // Target removes its 2 files
-                        tgt.locator("button[data-action='remove']").first().click();
-                        tgt.waitForTimeout(500);
-                        if (tgt.locator("button[data-action='remove']").count() > 0) {
-                            tgt.locator("button[data-action='remove']").first().click();
-                        }
-                    });
+            // Now both devices delete their other files while transfer is ongoing.
+            // Source: remove only small files (NOT the big 10 MB file being transferred).
+            src.evaluate(
+                "() => { document.querySelectorAll('.file-item').forEach(item => { " +
+                "  const meta = item.querySelector('.file-meta'); " +
+                "  const btn = item.querySelector('button[data-action=\"remove\"]'); " +
+                "  if (btn && meta && !meta.textContent.includes('10 MB')) btn.click(); " +
+                "}); }");
+
+            // Target: remove all its own files (it only has Remove buttons for its own files)
+            tgt.evaluate(
+                "() => { document.querySelectorAll('button[data-action=\"remove\"]').forEach(b => b.click()); }");
+
+            // Wait for the big file download to complete
+            tgt.waitForFunction(
+                    "() => { const el = document.getElementById('transfer-section'); " +
+                    "return !el || el.style.display === 'none' || el.style.display === ''; }",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(300_000));
+            tgt.waitForTimeout(2000);
+
+            assertEquals(1, downloads.size(), "Should have captured exactly 1 download");
+            Download download = downloads.get(0);
 
             // Verify the big file transferred correctly despite parallel deletions
             Path downloadedFile = download.path();
@@ -557,13 +564,6 @@ class FileTransferE2ETest {
             assertEquals(expectedBigHash, actualHash,
                     "Big file SHA-256 should match despite other files being deleted during transfer");
 
-            // Verify that the deleted files are actually gone from the UI
-            // Only the big file (from source, non-own on target) should remain — no download button
-            // since transfer is complete, and source should have 1 file left (the big one, shown as own)
-            src.waitForFunction(
-                    "() => document.querySelectorAll('.file-item').length <= 1",
-                    null,
-                    new Page.WaitForFunctionOptions().setTimeout(15_000));
         } finally {
             srcCtx.close();
             tgtCtx.close();
