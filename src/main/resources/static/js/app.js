@@ -47,6 +47,7 @@ function bindEvents() {
     // Create page
     document.getElementById('btn-create').addEventListener('click', handleCreate);
     document.getElementById('btn-generate-password').addEventListener('click', handleGeneratePassword);
+    document.getElementById('btn-quick-create').addEventListener('click', handleQuickCreate);
     onEnterKey('create-password-confirm', handleCreate);
 
     // Open page
@@ -94,6 +95,15 @@ function bindEvents() {
     });
     document.getElementById('qr-trusted-device').addEventListener('change', handleQrTrustedToggle);
 
+    // Password modal
+    document.getElementById('btn-view-password').addEventListener('click', handleViewPassword);
+    document.getElementById('btn-toggle-password').addEventListener('click', handleTogglePassword);
+    document.getElementById('btn-modal-copy-password').addEventListener('click', handleCopyPassword);
+    document.getElementById('btn-close-password-modal').addEventListener('click', hidePasswordModal);
+    document.getElementById('password-modal').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) hidePasswordModal();
+    });
+
     // Delete confirmation modal
     document.getElementById('btn-confirm-delete').addEventListener('click', handleDelete);
     document.getElementById('btn-cancel-delete').addEventListener('click', ui.hideDeleteModal);
@@ -140,6 +150,7 @@ function onRouteChange(route) {
         if (state.clipboardCode === route.code && state.cryptoKey) {
             // Already authenticated for this clipboard
             ui.showUnlockedState(route.code);
+            showViewPasswordButton();
         } else if (fragmentPassword) {
             // Auto-authenticate using password from QR fragment
             autoOpenFromFragment(route.code, fragmentPassword);
@@ -203,15 +214,20 @@ async function autoOpenFromFragment(code, password) {
 
 // --- Generate random password ---
 
-function handleGeneratePassword() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+';
-    const length = 16;
+function generateRandomPassword() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_~.';
+    const length = 20;
     const array = new Uint32Array(length);
     window.crypto.getRandomValues(array);
     let password = '';
     for (let i = 0; i < length; i++) {
         password += chars[array[i] % chars.length];
     }
+    return password;
+}
+
+function handleGeneratePassword() {
+    const password = generateRandomPassword();
 
     const input = document.getElementById('create-password');
     input.value = password;
@@ -273,6 +289,88 @@ async function handleCreate() {
     } finally {
         btn.disabled = false;
     }
+}
+
+// --- Quick create with random password ---
+
+async function handleQuickCreate() {
+    const btn = document.getElementById('btn-quick-create');
+    btn.disabled = true;
+
+    try {
+        const password = generateRandomPassword();
+
+        // Phase 1: Create clipboard (server generates salt)
+        const result = await api.createClipboard();
+
+        // Phase 2: Compute password hash using server salt, then set it
+        const passwordHash = await crypto.computePasswordHash(password, result.salt);
+        await api.setPassword(result.clipboardCode, passwordHash);
+
+        // Derive encryption key from password + server salt
+        const key = await crypto.deriveKey(password, result.salt);
+
+        setState({
+            clipboardCode: result.clipboardCode,
+            password,
+            passwordHash,
+            cryptoKey: key,
+            salt: result.salt,
+            generatedPassword: password,
+        });
+
+        // Navigate to clipboard page
+        router.navigate(`/c/${result.clipboardCode}`);
+
+        // Connect after navigation (route handler will show unlocked state)
+        connectToClipboard(result.clipboardCode, passwordHash);
+    } catch (err) {
+        ui.showError('create-error', err.message);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function showViewPasswordButton() {
+    const state = getState();
+    const btn = document.getElementById('btn-view-password');
+    btn.style.display = (state.generatedPassword) ? '' : 'none';
+}
+
+function handleViewPassword() {
+    const el = document.getElementById('password-modal-value');
+    el.textContent = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+    el.dataset.revealed = 'false';
+    document.getElementById('btn-toggle-password').textContent = 'Show';
+    document.getElementById('password-modal').style.display = 'flex';
+}
+
+function handleTogglePassword() {
+    const state = getState();
+    const el = document.getElementById('password-modal-value');
+    const btn = document.getElementById('btn-toggle-password');
+    if (el.dataset.revealed === 'true') {
+        el.textContent = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+        el.dataset.revealed = 'false';
+        btn.textContent = 'Show';
+    } else {
+        el.textContent = state.generatedPassword;
+        el.dataset.revealed = 'true';
+        btn.textContent = 'Hide';
+    }
+}
+
+function handleCopyPassword() {
+    const state = getState();
+    navigator.clipboard.writeText(state.generatedPassword).then(() => {
+        const btn = document.getElementById('btn-modal-copy-password');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    });
+}
+
+function hidePasswordModal() {
+    document.getElementById('password-modal').style.display = 'none';
 }
 
 // --- Open existing clipboard (from /open page) ---
