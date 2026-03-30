@@ -51,6 +51,7 @@ export function resetState() {
         state.textUpdateTimer = null;
     }
     state.isUpdatingText = false;
+    state.generatedPassword = null;
 }
 
 export function generateDeviceId() {

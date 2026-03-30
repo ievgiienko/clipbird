@@ -31,7 +31,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="ClipBird">
     <link rel="apple-touch-icon" href="/img/icon-192.svg">
-    <link rel="stylesheet" href="/css/styles.css?v=1">
+    <link rel="stylesheet" href="/css/styles.css?v=3">
     <script>
         (function() {
             var t = localStorage.getItem('theme');
@@ -172,6 +172,8 @@
                     <input type="password" id="create-password-confirm" placeholder="Confirm your password" autocomplete="off">
                 </div>
                 <button id="btn-create" class="btn btn-primary btn-full">Create Clipboard</button>
+                <div class="create-divider"><span>or</span></div>
+                <button id="btn-quick-create" class="btn btn-secondary btn-full">Quick Create with Random Password</button>
             </div>
             <div id="create-error" class="error-box" style="display:none"></div>
         </div>
@@ -228,6 +230,7 @@
                 <div class="header-actions">
                     <button id="btn-copy-link" class="btn btn-small btn-secondary" title="Copy clipboard link">Copy Link</button>
                     <button id="btn-show-qr" class="btn btn-small btn-secondary" title="Show QR code">QR Code</button>
+                    <button id="btn-view-password" class="btn btn-small btn-secondary" title="View clipboard password" style="display:none">Password</button>
                     <a href="/" data-link class="btn btn-small">Home</a>
                 </div>
             </div>
@@ -298,6 +301,26 @@
         </div>
     </div>
 
+    <!-- Password Modal -->
+    <div id="password-modal" class="modal-overlay" style="display:none">
+        <div class="modal modal-small" role="dialog" aria-labelledby="password-modal-title" aria-modal="true">
+            <div class="modal-header">
+                <h2 id="password-modal-title">Clipboard Password</h2>
+                <button id="btn-close-password-modal" class="modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="password-modal-hint">This password was auto-generated when the clipboard was created. You will need it to access this clipboard on other devices.</p>
+                <div class="password-modal-field">
+                    <code id="password-modal-value" class="password-modal-value">&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</code>
+                </div>
+                <div class="password-modal-actions">
+                    <button id="btn-toggle-password" class="btn btn-secondary">Show</button>
+                    <button id="btn-modal-copy-password" class="btn btn-primary">Copy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Confirm Delete Modal -->
     <div id="confirm-delete-modal" class="modal-overlay" style="display:none">
         <div class="modal modal-small" role="dialog" aria-labelledby="delete-modal-title" aria-modal="true">
@@ -354,6 +377,6 @@
         </div>
     </footer>
 
-    <script type="module" src="/js/app.js?v=5"></script>
+    <script type="module" src="/js/app.js?v=7"></script>
 </body>
 </html>
