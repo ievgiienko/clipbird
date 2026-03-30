@@ -277,6 +277,7 @@ async function handleCreate() {
             passwordHash,
             cryptoKey: key,
             salt: result.salt,
+            generatedPassword: null,
         });
 
         // Navigate to clipboard page
@@ -446,6 +447,7 @@ async function authenticateAndOpen(code, password, errorElementId) {
             passwordHash,
             cryptoKey: key,
             salt: handshake.salt,
+            generatedPassword: null,
         });
 
         // Navigate to clipboard page (if not already there)
@@ -1314,6 +1316,7 @@ function cleanupAndGoHome() {
     ui.setTextVersion(0);
     ui.setConnectionStatus(false);
     ui.setDeviceCount(0);
+    hidePasswordModal();
     ui.hideDeletedOverlay();
     router.navigate('/');
 }
