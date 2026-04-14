@@ -2,6 +2,7 @@ package com.secureclipboard.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -29,11 +30,18 @@ public class DeviceSessionManager {
 
     private final RedisSessionStore redisSessionStore;
 
+    @Value("${app.clipboard.max-devices:10}")
+    private int maxDevices;
+
     public DeviceSessionManager(RedisSessionStore redisSessionStore) {
         this.redisSessionStore = redisSessionStore;
     }
 
     public void join(String clipboardCode, String deviceId, WebSocketSession session) {
+        int current = getConnectedCount(clipboardCode);
+        if (current >= maxDevices) {
+            throw new IllegalStateException("Max devices reached for clipboard " + clipboardCode);
+        }
         rooms.computeIfAbsent(clipboardCode, k -> new ConcurrentHashMap<>())
              .put(deviceId, session);
         sessionToDevice.put(session.getId(), deviceId);
