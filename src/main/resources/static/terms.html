@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClipBird — Secure Online Clipboard</title>
+    <meta name="description" content="Share text and files between devices with end-to-end encryption. No signup, no install — just create an online clipboard, set a password, and share securely with strong encryption in your browser.">
+    <meta name="keywords" content="online clipboard, encrypted clipboard, file transfer, end-to-end encryption, share text, cross-device clipboard, AES-256, private sharing">
+    <meta name="author" content="ClipBird">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://clipbird.net/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="ClipBird — Secure Online Clipboard">
+    <meta property="og:description" content="Share text and files between devices with end-to-end encryption. No signup required — all encryption happens in your browser.">
+    <meta property="og:url" content="https://clipbird.net/">
+    <meta property="og:site_name" content="ClipBird">
+    <meta property="og:image" content="https://clipbird.net/img/icon-512.svg">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="ClipBird — Secure Online Clipboard">
+    <meta name="twitter:description" content="End-to-end encrypted clipboard sharing between devices. No signup, no install — AES-256-GCM encryption in your browser.">
+    <meta name="twitter:image" content="https://clipbird.net/img/icon-512.svg">
+
+    <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#2196F3">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ClipBird">
+    <link rel="apple-touch-icon" href="/img/icon-192.svg">
+    <link rel="stylesheet" href="css/styles.css?v=3">
+    <script>
+        (function() {
+            var t = localStorage.getItem('theme');
+            if (!t) t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="site-header">
+        <div class="header-container">
+            <a href="/" data-link class="site-logo">
+                <img src="/img/icon.svg" alt="" class="site-logo-icon" width="32" height="32">
+                <span class="site-logo-text">Clip<span class="accent">Bird</span></span>
+            </a>
+            <nav class="site-nav">
+                <a href="/create" data-link class="nav-link">Create</a>
+                <a href="/open" data-link class="nav-link">Open</a>
+                <div class="theme-toggle" id="theme-toggle" role="radiogroup" aria-label="Theme">
+                    <button class="theme-toggle-option" data-theme-value="light" aria-label="Light theme" title="Light theme">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                    </button>
+                    <button class="theme-toggle-option" data-theme-value="dark" aria-label="Dark theme" title="Dark theme">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    </button>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content-->
+
+ <main>
+
+            <div class="terms-content">
+                <h2  class="terms-title">Terms & Conditions</h2>
+                <p  class="terms-subtitle">Last Updated: April 15, 2026</p>
+            </div>
+
+            <div class="terms-text">
+                <div class="terms-section">
+                    <h3 class="terms-heading">1. Acceptance of Terms</h3>
+                    <p>By accessing or using the services provided by Parcelr.com, you agree to comply with and be bound by this agreement. If you do not agree to these terms, you must discontinue service use immediately.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">2. Eligibility</h3>
+                    <p>You must be at least 18 years of age or have the legal capacity to enter into an agreement in your jurisdiction to use our services.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">3. Account Registration and Security</h3>
+                    <p>Users must provide accurate information during account registration and maintain the confidentiality of their credentials. You are required to report any unauthorized access to your account immediately.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">4. User Conduct</h3>
+                    <p>Users are prohibited from engaging in illegal activities, uploading malware or harmful content, engaging in fraudulent, misleading, or unethical activities, and making unauthorized system access attempts.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">5. Services Usage</h3>
+                    <p>We grant you a limited, non-exclusive, non-transferable license for personal use of our services. Users retain ownership of submitted content but grant the company perpetual worldwide rights to use it. The company reserves the right to modify services at any time.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">6. Intellectual Property Rights</h3>
+                    <p>All platform materials, including but not limited to text, graphics, logos, and software, are protected by applicable intellectual property laws. Content cannot be used without explicit authorization from the company.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">7. Disclaimer of Warranties</h3>
+                    <p>Our services are provided on an "as is" and "as available" basis with no guarantees regarding accuracy, reliability, or results. We make no warranties, express or implied, regarding the operation or availability of our services.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">8. Limitation of Liability</h3>
+                    <p>The company's liability is capped at amounts paid by users for the services. We exclude any liability for indirect, incidental, consequential, or punitive damages arising from your use of our services.</p>
+                </div>
+
+                <div class="terms-section">
+                    <h3 class="terms-heading">9. Indemnification</h3>
+                    <p>Users agree to protect, defend, and hold harmless the company from any claims, damages, losses, or expenses arising from their service use or violations of this agreement.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">10. Governing Law</h3>
+                    <p>This Agreement is governed by and shall be construed in accordance with the laws of Ukraine. Any disputes shall be resolved through Ukrainian courts.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">11. Changes to Agreement</h3>
+                    <p>The company reserves the right to modify these terms at any time. Continued use of the services after changes are posted implies acceptance of the revised terms.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">12. Termination</h3>
+                    <p>We reserve the right to suspend or terminate your access to the services at any time, without notice, for violations of this agreement or any applicable laws.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">13. Third-Party Services</h3>
+                    <p>Our service may contain links to third-party websites or services. The company disclaims responsibility for the content, policies, or practices of any external links or services.</p>
+                </div>
+
+                <div  class="terms-section">
+                    <h3 class="terms-heading">14. Contact</h3>
+                    <p>For questions or concerns regarding these Terms and Conditions, please contact us at <a href="#" class="text-link">:...</a></p>
+                </div>
+            
+    </main>
+        
+            
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-container">
+            <span>&copy; ClipBird</span>
+            <span class="footer-sep">&middot;</span>
+            <span class="footer-tagline">Secure clipboard between your devices</span>
+       
+        <div>
+            <a href="privacy.html">Privacy Policy</a>
+            <span class="footer-sep">·</span>
+            <a href="terms.html">Terms & Conditions</a>
+            <span class="footer-sep">·</span>
+            <a href="refund.html">Refund Policy</a>
+        </div>
+    </div>
+    </footer>
+
+    <script type="module" src="/js/app.js?v=7"></script>
+</body>
+</html>
