@@ -31,6 +31,7 @@ app:
     chunk-size-bytes: 1048576
     min-chunk-size-bytes: 262144
     max-chunk-size-bytes: 5242880
+    max-devices: 10
   cleanup:
     interval-seconds: 3600
     transfer-timeout-seconds: 600
