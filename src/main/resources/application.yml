@@ -53,6 +53,12 @@ app:
   rate-limit:
     max-creates-per-minute: ${RATE_LIMIT_CREATES:10}
     max-opens-per-minute: ${RATE_LIMIT_OPENS:30}
+  telegram:
+    enabled: ${TELEGRAM_ENABLED:false}
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    webhook-url: ${TELEGRAM_WEBHOOK_URL:}
+    webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+    report-cron: ${TELEGRAM_REPORT_CRON:0 0 9 * * *}
 
 logging:
   level:

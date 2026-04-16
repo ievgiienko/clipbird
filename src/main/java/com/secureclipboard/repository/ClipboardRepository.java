@@ -27,4 +27,15 @@ public interface ClipboardRepository extends JpaRepository<Clipboard, Long> {
     void updateStatus(Long id, ClipboardStatus status);
 
     List<Clipboard> findByStatusInAndExpiresAtBefore(List<ClipboardStatus> statuses, Instant cutoff);
+
+    // --- Stats ---
+
+    @Query("SELECT COUNT(c) FROM Clipboard c WHERE c.createdAt >= :from AND c.createdAt < :to")
+    long countCreatedBetween(Instant from, Instant to);
+
+    @Query("SELECT COUNT(c) FROM Clipboard c WHERE c.expiresAt >= :from AND c.expiresAt < :to")
+    long countExpiredBetween(Instant from, Instant to);
+
+    @Query("SELECT COUNT(c) FROM Clipboard c WHERE c.status = com.secureclipboard.domain.ClipboardStatus.ACTIVE")
+    long countActive();
 }

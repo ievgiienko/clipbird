@@ -10,6 +10,7 @@ public class AppProperties {
     private ClipboardProps clipboard = new ClipboardProps();
     private CleanupProps cleanup = new CleanupProps();
     private RateLimitProps rateLimit = new RateLimitProps();
+    private TelegramProps telegram = new TelegramProps();
 
     public ClipboardProps getClipboard() { return clipboard; }
     public void setClipboard(ClipboardProps clipboard) { this.clipboard = clipboard; }
@@ -19,6 +20,9 @@ public class AppProperties {
 
     public RateLimitProps getRateLimit() { return rateLimit; }
     public void setRateLimit(RateLimitProps rateLimit) { this.rateLimit = rateLimit; }
+
+    public TelegramProps getTelegram() { return telegram; }
+    public void setTelegram(TelegramProps telegram) { this.telegram = telegram; }
 
     public static class ClipboardProps {
         private int idLength = 8;
@@ -69,5 +73,28 @@ public class AppProperties {
         public void setMaxCreatesPerMinute(int maxCreatesPerMinute) { this.maxCreatesPerMinute = maxCreatesPerMinute; }
         public int getMaxOpensPerMinute() { return maxOpensPerMinute; }
         public void setMaxOpensPerMinute(int maxOpensPerMinute) { this.maxOpensPerMinute = maxOpensPerMinute; }
+    }
+
+    public static class TelegramProps {
+        private boolean enabled = false;
+        private String botToken = "";
+        private String webhookUrl = "";
+        private String webhookSecret = "";
+        private String reportCron = "0 0 9 * * *";
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+        public String getBotToken() { return botToken; }
+        public void setBotToken(String botToken) { this.botToken = botToken; }
+
+        public String getWebhookUrl() { return webhookUrl; }
+        public void setWebhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; }
+
+        public String getWebhookSecret() { return webhookSecret; }
+        public void setWebhookSecret(String webhookSecret) { this.webhookSecret = webhookSecret; }
+
+        public String getReportCron() { return reportCron; }
+        public void setReportCron(String reportCron) { this.reportCron = reportCron; }
     }
 }
