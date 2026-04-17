@@ -78,8 +78,9 @@ public class AppProperties {
     public static class TelegramProps {
         private boolean enabled = false;
         private String botToken = "";
+        private String botUsername = "";
         private String webhookUrl = "";
-        private String webhookSecret = "";
+        private String webhookPath = "/telegram/webhook";
         private String reportCron = "0 0 9 * * *";
 
         public boolean isEnabled() { return enabled; }
@@ -88,11 +89,14 @@ public class AppProperties {
         public String getBotToken() { return botToken; }
         public void setBotToken(String botToken) { this.botToken = botToken; }
 
+        public String getBotUsername() { return botUsername; }
+        public void setBotUsername(String botUsername) { this.botUsername = botUsername; }
+
         public String getWebhookUrl() { return webhookUrl; }
         public void setWebhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; }
 
-        public String getWebhookSecret() { return webhookSecret; }
-        public void setWebhookSecret(String webhookSecret) { this.webhookSecret = webhookSecret; }
+        public String getWebhookPath() { return webhookPath; }
+        public void setWebhookPath(String webhookPath) { this.webhookPath = webhookPath; }
 
         public String getReportCron() { return reportCron; }
         public void setReportCron(String reportCron) { this.reportCron = reportCron; }
