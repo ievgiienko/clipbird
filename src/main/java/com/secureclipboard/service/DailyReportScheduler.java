@@ -1,38 +1,34 @@
 package com.secureclipboard.service;
 
-import com.secureclipboard.config.AppProperties;
 import com.secureclipboard.repository.TelegramSubscriberRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
+@ConditionalOnProperty(name = "app.telegram.enabled", havingValue = "true")
 public class DailyReportScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(DailyReportScheduler.class);
 
-    private final TelegramBotService botService;
+    private final ClipbirdTelegramBot botService;
     private final DailyReportService reportService;
     private final TelegramSubscriberRepository subscriberRepo;
-    private final AppProperties appProps;
 
-    public DailyReportScheduler(TelegramBotService botService,
+    public DailyReportScheduler(ClipbirdTelegramBot bot,
                                  DailyReportService reportService,
-                                 TelegramSubscriberRepository subscriberRepo,
-                                 AppProperties appProps) {
-        this.botService = botService;
+                                 TelegramSubscriberRepository subscriberRepo) {
+        this.botService = bot;
         this.reportService = reportService;
         this.subscriberRepo = subscriberRepo;
-        this.appProps = appProps;
     }
 
     @Scheduled(cron = "${app.telegram.report-cron:0 0 9 * * *}")
     public void sendDailyReport() {
-        if (!appProps.getTelegram().isEnabled()) return;
-
         List<Long> chatIds = subscriberRepo.findAllChatIds();
         if (chatIds.isEmpty()) return;
 

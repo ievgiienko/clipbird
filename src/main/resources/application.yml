@@ -56,8 +56,9 @@ app:
   telegram:
     enabled: ${TELEGRAM_ENABLED:false}
     bot-token: ${TELEGRAM_BOT_TOKEN:}
+    bot-username: ${TELEGRAM_BOT_USERNAME:}
     webhook-url: ${TELEGRAM_WEBHOOK_URL:}
-    webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+    webhook-path: ${TELEGRAM_WEBHOOK_PATH:/telegram/webhook}
     report-cron: ${TELEGRAM_REPORT_CRON:0 0 9 * * *}
 
 logging:
