@@ -1,0 +1,113 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClipBird — Secure Online Clipboard</title>
+    <meta name="description" content="Share text and files between devices with end-to-end encryption. No signup, no install — just create an online clipboard, set a password, and share securely with strong encryption in your browser.">
+    <meta name="keywords" content="online clipboard, encrypted clipboard, file transfer, end-to-end encryption, share text, cross-device clipboard, AES-256, private sharing">
+    <meta name="author" content="ClipBird">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://clipbird.net/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="ClipBird — Secure Online Clipboard">
+    <meta property="og:description" content="Share text and files between devices with end-to-end encryption. No signup required — all encryption happens in your browser.">
+    <meta property="og:url" content="https://clipbird.net/">
+    <meta property="og:site_name" content="ClipBird">
+    <meta property="og:image" content="https://clipbird.net/img/icon-512.svg">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="ClipBird — Secure Online Clipboard">
+    <meta name="twitter:description" content="End-to-end encrypted clipboard sharing between devices. No signup, no install — AES-256-GCM encryption in your browser.">
+    <meta name="twitter:image" content="https://clipbird.net/img/icon-512.svg">
+
+    <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#2196F3">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ClipBird">
+    <link rel="apple-touch-icon" href="/img/icon-192.svg">
+    <link rel="stylesheet" href="css/styles.css?v=3">
+    <script>
+        (function() {
+            var t = localStorage.getItem('theme');
+            if (!t) t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="site-header">
+        <div class="header-container">
+            <a href="/" data-link class="site-logo">
+                <img src="/img/icon.svg" alt="" class="site-logo-icon" width="32" height="32">
+                <span class="site-logo-text">Clip<span class="accent">Bird</span></span>
+            </a>
+            <nav class="site-nav">
+                <a href="/create" data-link class="nav-link">Create</a>
+                <a href="/open" data-link class="nav-link">Open</a>
+                <div class="theme-toggle" id="theme-toggle" role="radiogroup" aria-label="Theme">
+                    <button class="theme-toggle-option" data-theme-value="light" aria-label="Light theme" title="Light theme">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                    </button>
+                    <button class="theme-toggle-option" data-theme-value="dark" aria-label="Dark theme" title="Dark theme">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    </button>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    
+            <div class="refund-content">
+                <h2 class="refund-title">Refund Policy</h2>
+                <p class="refund-subtitle">Our refund and cancellation terms</p>
+            </div>
+
+            <div class="refund-text">
+                <div class="refund-section">
+                    <h3 class="refund-heading">Trial Period and Evaluation</h3>
+                    <p>We offer a Free Trial period where all features of Parcelr.com are available for testing and evaluation. Users are encouraged to thoroughly assess the platform and evaluate the service during this complimentary period before making any financial commitment.</p>
+                </div>
+
+                <div class="refund-section">
+                    <h3 class="refund-heading">Subscription Payment and Refunds</h3>
+                    <p class="refund-paragraph">Once purchased, subscription fees are non-refundable. By subscribing to our service, you acknowledge that you have had sufficient opportunity to assess the service during the trial period and that no refunds will be provided for subscription fees already charged.</p>
+                    <p class="refund-paragraph">You may cancel your subscription at any time, but cancellation does not trigger refunds for fees that have already been charged. Your access to the service will continue through the current billing cycle.</p>
+                    <p>If you believe there has been a billing error or mistake, please contact our support team at <a href="#" class="text-link">:...</a> and we will work with you to resolve the issue.</p>
+                </div>
+
+                <div class="refund-section">
+                    <h3 class="refund-heading">Policy Modifications</h3>
+                    <p>Parcelr.com reserves the right to modify this Refund Policy at any time. Any updates or changes will take effect immediately upon posting to this page. Your continued use of the service after any such changes implies your acceptance of the revised terms.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-container">
+            <span>&copy; ClipBird</span>
+            <span class="footer-sep">&middot;</span>
+            <span class="footer-tagline">Secure clipboard between your devices</span>
+       
+        <div>
+            <a href="privacy.html">Privacy Policy</a>
+            <span class="footer-sep">·</span>
+            <a href="terms.html">Terms & Conditions</a>
+            <span class="footer-sep">·</span>
+            <a href="refund.html">Refund Policy</a>
+        </div>
+    </div>
+    </footer>
+
+    <script type="module" src="/js/app.js?v=7"></script>
+</body>
+</html>

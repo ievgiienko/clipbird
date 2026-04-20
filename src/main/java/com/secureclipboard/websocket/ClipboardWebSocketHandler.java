@@ -121,7 +121,15 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        sessionManager.join(clipboardCode, deviceId, session);
+        try {
+            sessionManager.join(clipboardCode, deviceId, session);
+        } catch (IllegalStateException e) {
+            ObjectNode msg = objectMapper.createObjectNode();
+            msg.put("type", "max_devices_reached");
+            msg.put("message", e.getMessage());
+            sendMessage(session, msg.toString());
+            return;
+        }
 
         ObjectNode joinConfirm = objectMapper.createObjectNode();
         joinConfirm.put("type", "joined");
