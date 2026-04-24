@@ -755,6 +755,12 @@ textarea {
 .device-count {
     color: var(--text-muted);
 }
+.btn-small {
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 6px;
+  }
+
 
 /* --- Text info --- */
 
