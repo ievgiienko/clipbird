@@ -1,3 +1,3 @@
 package com.secureclipboard.dto;
 
-public record CreateClipboardRequest() {}
+public record CreateClipboardRequest(Integer ttlHours) {}

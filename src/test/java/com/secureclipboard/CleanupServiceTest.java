@@ -46,7 +46,7 @@ class CleanupServiceTest {
 
     @Test
     void deletedClipboardNotImmediatelyHardDeleted() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
         clipboardService.deleteClipboard(code);
@@ -65,7 +65,7 @@ class CleanupServiceTest {
 
     @Test
     void deletedClipboardHardDeletedAfterRetentionPeriod() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
         clipboardService.deleteClipboard(code);
@@ -84,7 +84,7 @@ class CleanupServiceTest {
 
     @Test
     void expiredClipboardHardDeletedAfterRetentionPeriod() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -103,7 +103,7 @@ class CleanupServiceTest {
 
     @Test
     void activeClipboardNotHardDeleted() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -122,7 +122,7 @@ class CleanupServiceTest {
 
     @Test
     void hardDeleteFreesClipboardCode() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
         clipboardService.deleteClipboard(code);
@@ -145,7 +145,7 @@ class CleanupServiceTest {
 
     @Test
     void purgeIsIdempotent() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
         clipboardService.deleteClipboard(code);
@@ -166,7 +166,7 @@ class CleanupServiceTest {
         try {
             appProps.getCleanup().setHardDeleteEnabled(false);
 
-            ClipboardCreatedResponse created = clipboardService.createClipboard();
+            ClipboardCreatedResponse created = clipboardService.createClipboard(null);
             String code = created.clipboardCode();
             clipboardService.setPasswordHash(code, "hash");
             clipboardService.deleteClipboard(code);
@@ -188,7 +188,7 @@ class CleanupServiceTest {
 
     @Test
     void purgeRemovesRemainingChildRecords() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 

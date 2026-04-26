@@ -123,4 +123,21 @@ class ClipboardControllerTest {
         mockMvc.perform(get("/api/clipboards/NONEXIST/handshake"))
             .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void shouldCreateClipboardWithCustomTtl() throws Exception {
+        mockMvc.perform(post("/api/clipboards")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ttlHours\":1}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.expiresAt").isNotEmpty());
+    }
+
+    @Test
+    void shouldRejectInvalidTtl() throws Exception {
+        mockMvc.perform(post("/api/clipboards")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ttlHours\":99}"))
+            .andExpect(status().isBadRequest());
+    }
 }
