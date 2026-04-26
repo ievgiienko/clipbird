@@ -53,7 +53,7 @@ class TransferServiceTest {
     @BeforeEach
     void setUp() {
         // Create a clipboard with password
-        var created = clipboardService.createClipboard();
+        var created = clipboardService.createClipboard(null);
         clipboardCode = created.clipboardCode();
         clipboardService.setPasswordHash(clipboardCode, "testHash");
 
