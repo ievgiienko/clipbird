@@ -23,8 +23,8 @@ async function request(method, path, body = null) {
     return text ? JSON.parse(text) : null;
 }
 
-export async function createClipboard() {
-    return request('POST', '/clipboards');
+export async function createClipboard(ttlHours) {
+    return request('POST', '/clipboards', ttlHours != null ? { ttlHours } : null);
 }
 
 export async function setPassword(clipboardCode, passwordHash) {

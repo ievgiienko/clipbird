@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.socket.WebSocketSession;
 
+import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -35,7 +36,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldCreateClipboard() {
-        ClipboardCreatedResponse response = clipboardService.createClipboard();
+        ClipboardCreatedResponse response = clipboardService.createClipboard(null);
 
         assertNotNull(response.clipboardCode());
         assertEquals(8, response.clipboardCode().length());
@@ -52,7 +53,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldSetPasswordAndVerify() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
 
         clipboardService.setPasswordHash(code, "testPasswordHash123");
@@ -62,7 +63,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldUpdateAndRetrieveText() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -84,7 +85,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldIncrementVersionOnMultipleUpdates() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -97,7 +98,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldDeleteClipboard() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -112,7 +113,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldRejectPasswordSetTwice() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
 
         clipboardService.setPasswordHash(code, "hash1");
@@ -121,7 +122,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldStoreAndReturnFileHash() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -146,8 +147,24 @@ class ClipboardServiceTest {
     }
 
     @Test
+    void shouldCreateClipboardWithCustomTtl() {
+        ClipboardCreatedResponse response = clipboardService.createClipboard(new CreateClipboardRequest(1));
+
+        Instant expiresAt = Instant.parse(response.expiresAt());
+        long minutesUntilExpiry = java.time.Duration.between(Instant.now(), expiresAt).toMinutes();
+        assertTrue(minutesUntilExpiry > 50 && minutesUntilExpiry <= 60,
+            "1h TTL should expire in ~60 minutes, got " + minutesUntilExpiry);
+    }
+
+    @Test
+    void shouldRejectInvalidTtl() {
+        assertThrows(IllegalArgumentException.class,
+            () -> clipboardService.createClipboard(new CreateClipboardRequest(99)));
+    }
+
+    @Test
     void shouldAllowNullFileHash() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard();
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 

@@ -43,12 +43,27 @@ document.addEventListener('DOMContentLoaded', () => {
     router.init(onRouteChange);
 });
 
+function getSelectedTtl() {
+    const active = document.querySelector('#ttl-selector .ttl-option.active');
+    return active ? parseInt(active.dataset.ttl, 10) : 24;
+}
+
 function bindEvents() {
     // Create page
     document.getElementById('btn-create').addEventListener('click', handleCreate);
     document.getElementById('btn-generate-password').addEventListener('click', handleGeneratePassword);
     document.getElementById('btn-quick-create').addEventListener('click', handleQuickCreate);
     onEnterKey('create-password-confirm', handleCreate);
+    document.querySelectorAll('#ttl-selector .ttl-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#ttl-selector .ttl-option').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+            });
+            btn.classList.add('active');
+            btn.setAttribute('aria-pressed', 'true');
+        });
+    });
 
     // Open page
     document.getElementById('btn-open').addEventListener('click', handleOpen);
@@ -63,6 +78,8 @@ function bindEvents() {
     document.getElementById('btn-copy-link').addEventListener('click', handleCopyLink);
     document.getElementById('btn-show-qr').addEventListener('click', handleShowQr);
     document.getElementById('clipboard-text').addEventListener('input', handleTextInput);
+
+
 
     // File handling
     document.getElementById('btn-add-file').addEventListener('click', (e) => {
@@ -151,13 +168,20 @@ function onRouteChange(route) {
             // Already authenticated for this clipboard
             ui.showUnlockedState(route.code);
             showViewPasswordButton();
+
+
+
         } else if (fragmentPassword) {
             // Auto-authenticate using password from QR fragment
             autoOpenFromFragment(route.code, fragmentPassword);
         } else {
             // Need password — show manual entry
             ui.showLockedState(route.code);
+
+
         }
+
+
     }
 
     if (route.page === 'create') {
@@ -262,7 +286,7 @@ async function handleCreate() {
 
     try {
         // Phase 1: Create clipboard (server generates salt)
-        const result = await api.createClipboard();
+        const result = await api.createClipboard(getSelectedTtl());
 
         // Phase 2: Compute password hash using server salt, then set it
         const passwordHash = await crypto.computePasswordHash(password, result.salt);
@@ -302,7 +326,7 @@ async function handleQuickCreate() {
         const password = generateRandomPassword();
 
         // Phase 1: Create clipboard (server generates salt)
-        const result = await api.createClipboard();
+        const result = await api.createClipboard(getSelectedTtl());
 
         // Phase 2: Compute password hash using server salt, then set it
         const passwordHash = await crypto.computePasswordHash(password, result.salt);
@@ -619,6 +643,7 @@ function handleTextInput() {
     const state = getState();
     if (state.isUpdatingText) return;
 
+
     const text = ui.getTextContent();
     ui.setTextSize(new TextEncoder().encode(text).length);
 
@@ -626,7 +651,9 @@ function handleTextInput() {
     setState({
         textUpdateTimer: setTimeout(() => sendTextUpdate(text), TEXT_DEBOUNCE_MS)
     });
+    
 }
+
 
 async function sendTextUpdate(text) {
     const state = getState();
@@ -1244,6 +1271,7 @@ async function refreshFileList() {
         await ui.renderFileList(clipState.files);
         updateDownloadAllButton();
     } catch { /* ignore refresh errors */ }
+    
 }
 
 // --- Copy link ---
@@ -1320,3 +1348,35 @@ function cleanupAndGoHome() {
     ui.hideDeletedOverlay();
     router.navigate('/');
 }
+
+
+
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('copy-btn');
+  
+    if (!btn) return;
+  
+    btn.addEventListener('click', async () => {
+      const textarea = document.getElementById('clipboard-text');
+      const text = textarea.value;
+  
+      try {
+        await navigator.clipboard.writeText(text);
+  
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.disabled = true;
+  
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.disabled = false;
+        }, 2000);
+  
+      } catch (err) {
+        console.error('Copy failed:', err);
+      }
+    });
+  });
+  
