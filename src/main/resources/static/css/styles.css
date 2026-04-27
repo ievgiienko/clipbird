@@ -755,6 +755,12 @@ textarea {
 .device-count {
     color: var(--text-muted);
 }
+.btn-small {
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 6px;
+  }
+
 
 /* --- Text info --- */
 
@@ -989,6 +995,41 @@ textarea {
     flex: 1;
     height: 1px;
     background: var(--border);
+}
+
+/* --- TTL Selector --- */
+
+.ttl-selector {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 3px;
+    gap: 3px;
+}
+
+.ttl-option {
+    flex: 1;
+    padding: 0.45rem 0.5rem;
+    border: none;
+    border-radius: calc(var(--radius) - 3px);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.ttl-option.active {
+    background: var(--primary);
+    color: #fff;
+}
+
+.ttl-option:hover:not(.active) {
+    background: var(--surface-hover);
+    color: var(--text);
 }
 
 /* --- Password modal --- */

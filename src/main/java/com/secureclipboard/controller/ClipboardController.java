@@ -18,8 +18,9 @@ public class ClipboardController {
     }
 
     @PostMapping
-    public ResponseEntity<ClipboardCreatedResponse> createClipboard() {
-        ClipboardCreatedResponse response = clipboardService.createClipboard();
+    public ResponseEntity<ClipboardCreatedResponse> createClipboard(
+            @RequestBody(required = false) CreateClipboardRequest request) {
+        ClipboardCreatedResponse response = clipboardService.createClipboard(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

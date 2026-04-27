@@ -48,6 +48,9 @@
                 <img src="/img/icon.svg" alt="" class="site-logo-icon" width="32" height="32">
                 <span class="site-logo-text">Clip<span class="accent">Bird</span></span>
             </a>
+
+
+          
             <nav class="site-nav">
                 <a href="/create" data-link class="nav-link">Create</a>
                 <a href="/open" data-link class="nav-link">Open</a>
@@ -67,11 +70,17 @@
     <div id="landing-page" class="page active">
         <div class="container">
             <div class="hero">
+
+            
                 <h1 class="hero-title">Clip<span class="accent">Bird</span></h1>
+
+
                 <p class="hero-subtitle">
                     A simple, secure way to share text and files between your devices.
                     Everything is encrypted before it leaves your browser &mdash; no one else can read it.
                 </p>
+
+            
                 <div class="hero-actions">
                     <div class="hero-action-block">
                         <a href="/create" data-link class="btn btn-primary btn-large">Create Clipboard</a>
@@ -171,6 +180,14 @@
                     <label for="create-password-confirm">Confirm Password</label>
                     <input type="password" id="create-password-confirm" placeholder="Confirm your password" autocomplete="off">
                 </div>
+                <div class="form-group">
+                    <label>Expires after</label>
+                    <div class="ttl-selector" role="radiogroup" aria-label="Expiry duration" id="ttl-selector">
+                        <button type="button" class="ttl-option" data-ttl="1" aria-pressed="false">1 hour</button>
+                        <button type="button" class="ttl-option active" data-ttl="24" aria-pressed="true">24 hours</button>
+                        <button type="button" class="ttl-option" data-ttl="168" aria-pressed="false">7 days</button>
+                    </div>
+                </div>
                 <button id="btn-create" class="btn btn-primary btn-full">Create Clipboard</button>
                 <div class="create-divider"><span>or</span></div>
                 <button id="btn-quick-create" class="btn btn-secondary btn-full">Quick Create with Random Password</button>
@@ -243,6 +260,8 @@
                     <span id="text-version">Version: 0</span>
                     <span id="text-size">0 B</span>
                 </div>
+                <button id="copy-btn" class="btn btn-primary btn-small">Copy</button>
+            
             </div>
 
             <!-- Files Section -->
@@ -274,6 +293,7 @@
             <!-- Danger Zone -->
             <div class="danger-zone">
                 <button id="btn-delete" class="btn btn-danger btn-small">Delete Clipboard</button>
+               
             </div>
         </div>
     </div>
