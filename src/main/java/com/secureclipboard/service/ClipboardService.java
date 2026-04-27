@@ -41,8 +41,10 @@ public class ClipboardService {
         this.appProps = appProps;
     }
 
+    private static final List<Integer> ALLOWED_TTL_HOURS = List.of(1, 24, 168);
+
     @Transactional
-    public ClipboardCreatedResponse createClipboard() {
+    public ClipboardCreatedResponse createClipboard(CreateClipboardRequest request) {
         String code;
         int attempts = 0;
         do {
@@ -54,7 +56,8 @@ public class ClipboardService {
         } while (clipboardRepo.existsByClipboardCode(code));
 
         String salt = CodeGenerator.generateSalt();
-        Instant expiresAt = Instant.now().plus(appProps.getClipboard().getTtlHours(), ChronoUnit.HOURS);
+        int ttlHours = resolveTtl(request);
+        Instant expiresAt = Instant.now().plus(ttlHours, ChronoUnit.HOURS);
 
         Clipboard clipboard = new Clipboard();
         clipboard.setClipboardCode(code);
@@ -234,6 +237,17 @@ public class ClipboardService {
         textRepo.deleteByClipboardId(clipId);
         sessionManager.removeRoom(clipboardCode);
         log.info("Clipboard deleted: {}", clipboardCode);
+    }
+
+    private int resolveTtl(CreateClipboardRequest request) {
+        if (request == null || request.ttlHours() == null) {
+            return appProps.getClipboard().getTtlHours();
+        }
+        int ttl = request.ttlHours();
+        if (!ALLOWED_TTL_HOURS.contains(ttl)) {
+            throw new IllegalArgumentException("Invalid TTL. Allowed values: 1, 24, 168");
+        }
+        return ttl;
     }
 
     public Clipboard findActiveClipboard(String clipboardCode) {

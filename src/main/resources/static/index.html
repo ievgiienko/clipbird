@@ -180,6 +180,14 @@
                     <label for="create-password-confirm">Confirm Password</label>
                     <input type="password" id="create-password-confirm" placeholder="Confirm your password" autocomplete="off">
                 </div>
+                <div class="form-group">
+                    <label>Expires after</label>
+                    <div class="ttl-selector" role="radiogroup" aria-label="Expiry duration" id="ttl-selector">
+                        <button type="button" class="ttl-option" data-ttl="1" aria-pressed="false">1 hour</button>
+                        <button type="button" class="ttl-option active" data-ttl="24" aria-pressed="true">24 hours</button>
+                        <button type="button" class="ttl-option" data-ttl="168" aria-pressed="false">7 days</button>
+                    </div>
+                </div>
                 <button id="btn-create" class="btn btn-primary btn-full">Create Clipboard</button>
                 <div class="create-divider"><span>or</span></div>
                 <button id="btn-quick-create" class="btn btn-secondary btn-full">Quick Create with Random Password</button>

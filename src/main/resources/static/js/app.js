@@ -43,12 +43,27 @@ document.addEventListener('DOMContentLoaded', () => {
     router.init(onRouteChange);
 });
 
+function getSelectedTtl() {
+    const active = document.querySelector('#ttl-selector .ttl-option.active');
+    return active ? parseInt(active.dataset.ttl, 10) : 24;
+}
+
 function bindEvents() {
     // Create page
     document.getElementById('btn-create').addEventListener('click', handleCreate);
     document.getElementById('btn-generate-password').addEventListener('click', handleGeneratePassword);
     document.getElementById('btn-quick-create').addEventListener('click', handleQuickCreate);
     onEnterKey('create-password-confirm', handleCreate);
+    document.querySelectorAll('#ttl-selector .ttl-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#ttl-selector .ttl-option').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+            });
+            btn.classList.add('active');
+            btn.setAttribute('aria-pressed', 'true');
+        });
+    });
 
     // Open page
     document.getElementById('btn-open').addEventListener('click', handleOpen);
@@ -271,7 +286,7 @@ async function handleCreate() {
 
     try {
         // Phase 1: Create clipboard (server generates salt)
-        const result = await api.createClipboard();
+        const result = await api.createClipboard(getSelectedTtl());
 
         // Phase 2: Compute password hash using server salt, then set it
         const passwordHash = await crypto.computePasswordHash(password, result.salt);
@@ -310,7 +325,7 @@ async function handleQuickCreate() {
         const password = generateRandomPassword();
 
         // Phase 1: Create clipboard (server generates salt)
-        const result = await api.createClipboard();
+        const result = await api.createClipboard(getSelectedTtl());
 
         // Phase 2: Compute password hash using server salt, then set it
         const passwordHash = await crypto.computePasswordHash(password, result.salt);
