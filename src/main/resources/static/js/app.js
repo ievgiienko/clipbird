@@ -628,6 +628,11 @@ function setupWsHandlers(ws) {
         cleanupAndGoHome();
     });
 
+    ws.on('max_devices_reached', () => {
+        ui.showError('clipboard-error', 'This clipboard is full — the maximum number of connected devices has been reached.');
+        if (ws) ws.disconnect();
+    });
+
     // Transfer signaling
     ws.on('send_chunk', handleSendChunkRequest);
     ws.on('chunk_ready', handleChunkReady);
