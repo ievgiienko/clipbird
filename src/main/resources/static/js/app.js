@@ -185,6 +185,11 @@ function onRouteChange(route) {
     }
 
     if (route.page === 'create') {
+        resetState();
+        fileStore.clearAll();
+        ui.setTextContent('');
+        ui.setTextVersion(0);
+
         document.getElementById('create-password').value = '';
         document.getElementById('create-password-confirm').value = '';
         passwordStrength.reset('password-strength');
@@ -628,6 +633,11 @@ function setupWsHandlers(ws) {
     ws.on('auth_failed', () => {
         ui.showError('clipboard-error', 'Authentication failed. Wrong password.');
         cleanupAndGoHome();
+    });
+
+    ws.on('max_devices_reached', () => {
+        ui.showError('clipboard-error', 'This clipboard is full — the maximum number of connected devices has been reached.');
+        if (ws) ws.disconnect();
     });
 
     // Transfer signaling
@@ -1336,6 +1346,7 @@ function handleDelete() {
 // --- Navigation helpers ---
 
 function cleanupAndGoHome() {
+    console.log("CLEANUP CALLED");
     if (ws) { ws.disconnect(); ws = null; }
     resetState();
     setState({ deviceId: generateDeviceId() });
