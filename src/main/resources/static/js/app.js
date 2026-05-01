@@ -185,6 +185,11 @@ function onRouteChange(route) {
     }
 
     if (route.page === 'create') {
+        resetState();
+        fileStore.clearAll();
+        ui.setTextContent('');
+        ui.setTextVersion(0);
+
         document.getElementById('create-password').value = '';
         document.getElementById('create-password-confirm').value = '';
         passwordStrength.reset('password-strength');
@@ -1339,6 +1344,7 @@ function handleDelete() {
 // --- Navigation helpers ---
 
 function cleanupAndGoHome() {
+    console.log("CLEANUP CALLED");
     if (ws) { ws.disconnect(); ws = null; }
     resetState();
     setState({ deviceId: generateDeviceId() });

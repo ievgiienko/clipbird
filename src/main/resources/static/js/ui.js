@@ -150,6 +150,10 @@ export function setTextContent(text) {
     document.getElementById('clipboard-text').value = text;
     setTextSize(new TextEncoder().encode(text).length);
 }
+export function  clear(){
+    let elCLear= document.getElementById('clipboard-text');
+    elCLear.value = "";
+}
 
 // --- Drop zone ---
 
