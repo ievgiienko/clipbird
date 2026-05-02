@@ -32,6 +32,7 @@ async function getDb() {
  * Store a file locally by its file code.
  */
 export async function storeFile(fileCode, file) {
+    console.log('STORE FILE CALLED', fileCode);
     const database = await getDb();
     return new Promise((resolve, reject) => {
         const tx = database.transaction(STORE_NAME, 'readwrite');
