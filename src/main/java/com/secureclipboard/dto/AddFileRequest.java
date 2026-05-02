@@ -11,5 +11,7 @@ public record AddFileRequest(
     @Positive long sizeBytes,
     @Positive int totalChunks,
     @NotBlank String sourceDeviceId,
-    String fileHash
+    String fileHash,
+    String encryptedPreview,
+    String encryptedPreviewIv
 ) {}
