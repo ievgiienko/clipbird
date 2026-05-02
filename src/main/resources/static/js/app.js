@@ -7,7 +7,7 @@
  * - Adaptive chunk sizing: measures throughput on first chunk, adjusts for remaining
  * - Binary transport: encrypted chunks sent as raw bytes, not base64 JSON
  */
-
+console.log('1');
 import * as crypto from './crypto.js';
 import * as api from './api.js';
 import { ClipboardWebSocket } from './ws.js';
@@ -20,6 +20,10 @@ import * as passwordStrength from './password-strength.js';
 import { initTheme } from './theme.js';
 import { initPwa } from './pwa.js';
 import * as fileWriter from './file-writer.js';
+
+
+
+console.log('APPLOADED');
 
 const CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB default
 const TEXT_DEBOUNCE_MS = 500;
@@ -34,19 +38,24 @@ let ws = null;
 // --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', () => {
+  
     initTheme();
     initPwa();
     fileWriter.cleanupOrphans();
     setState({ deviceId: generateDeviceId() });
     bindEvents();
     passwordStrength.bind('create-password', 'password-strength');
+ 
     router.init(onRouteChange);
 });
+
+
 
 function getSelectedTtl() {
     const active = document.querySelector('#ttl-selector .ttl-option.active');
     return active ? parseInt(active.dataset.ttl, 10) : 24;
 }
+
 
 function bindEvents() {
     // Create page
@@ -65,6 +74,7 @@ function bindEvents() {
         });
     });
 
+
     // Open page
     document.getElementById('btn-open').addEventListener('click', handleOpen);
     onEnterKey('open-password', handleOpen);
@@ -72,6 +82,7 @@ function bindEvents() {
     // URL-based open (clipboard locked state)
     document.getElementById('btn-url-open').addEventListener('click', handleUrlOpen);
     onEnterKey('url-password', handleUrlOpen);
+
 
     // Clipboard page
     document.getElementById('btn-delete').addEventListener('click', () => ui.showDeleteModal());
@@ -95,6 +106,7 @@ function bindEvents() {
     dropZone.addEventListener('dragover', handleDragOver);
     dropZone.addEventListener('dragleave', handleDragLeave);
     dropZone.addEventListener('drop', handleDrop);
+
 
     // Delegate file/transfer action clicks
     document.getElementById('file-list').addEventListener('click', handleFileAction);
@@ -139,7 +151,9 @@ function bindEvents() {
             ui.hideDeleteModal();
         }
     });
+
 }
+
 
 function onEnterKey(inputId, handler) {
     document.getElementById(inputId).addEventListener('keydown', (e) => {
@@ -149,42 +163,54 @@ function onEnterKey(inputId, handler) {
 
 // --- Route change handler ---
 
-function onRouteChange(route) {
+  async function onRouteChange(route) {
+ 
     const state = getState();
 
+
     // Clean up WS and overlays if navigating away from clipboard
+
+    
     if (route.page !== 'clipboard') {
-        if (ws) { ws.disconnect(); ws = null; }
+      
+        if(ws){
+            ws.disconnect();
+            ws=null;
+        }
+        resetState();
+        await fileStore.clearAll();
+        ui.renderFileList([]);
         ui.hideDeletedOverlay();
     }
 
     if (route.page === 'clipboard' && route.code) {
+
+     
         // Trusted-device flow: read password from URL fragment and strip it immediately.
         // The fragment is never sent to the server (RFC 3986).
         // replaceState removes it from the address bar and current history entry.
         const fragmentPassword = readAndStripFragment();
 
-        if (state.clipboardCode === route.code && state.cryptoKey) {
+
+        if ( state.clipboardCode === route.code && state.cryptoKey) {
             // Already authenticated for this clipboard
-            ui.showUnlockedState(route.code);
+
+         
             showViewPasswordButton();
 
+        }
 
 
-        } else if (fragmentPassword) {
+         else if (fragmentPassword) {
             // Auto-authenticate using password from QR fragment
             autoOpenFromFragment(route.code, fragmentPassword);
         } else {
             // Need password — show manual entry
             ui.showLockedState(route.code);
-
-
         }
-
-
     }
 
-    if (route.page === 'create') {
+    if ( route.page === 'create') {
         resetState();
         fileStore.clearAll();
         ui.setTextContent('');
@@ -205,6 +231,7 @@ function onRouteChange(route) {
     }
 }
 
+ 
 // --- Fragment handling (trusted-device flow) ---
 
 /**
@@ -213,6 +240,9 @@ function onRouteChange(route) {
  * The fragment is never sent to the server (RFC 3986).
  * replaceState removes it from the address bar and current history entry.
  */
+
+
+
 function readAndStripFragment() {
     const hash = window.location.hash;
     if (!hash || hash.length <= 1) return null;
@@ -242,6 +272,7 @@ async function autoOpenFromFragment(code, password) {
 }
 
 // --- Generate random password ---
+
 
 function generateRandomPassword() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_~.';
@@ -686,6 +717,19 @@ async function processFiles(files) {
     if (!files || files.length === 0) return;
 
     const state = getState();
+    if (!state.cryptoKey) {
+
+        console.error('NO CRYPTO KEY');
+    
+        alert('Подожди секунду и попробуй снова');
+    
+        return;
+    
+      }
+    
+     
+    
+        
     for (const file of files) {
         try {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
@@ -1387,4 +1431,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+
+
+
+
+
+
+
   
