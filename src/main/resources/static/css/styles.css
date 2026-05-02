@@ -864,23 +864,66 @@ textarea {
     color: var(--danger);
 }
 
+
 /* --- File list --- */
 
 .file-list {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    margin-top: 1rem;
 }
 
 .file-item {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     padding: 0.75rem 1rem;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    gap: 0.75rem;
+    gap: 1rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.file-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border-color: var(--primary);
+}
+
+.file-preview-container {
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.file-preview-icon {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+    background-color: var(--surface-hover);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.file-icon-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--surface-hover);
+    color: var(--primary); /* Используем основной цвет для акцента */
+    font-size: 0.65rem;
+    font-weight: 800;
+    border-radius: 6px;
+    border: 1px dashed var(--border);
+    text-transform: uppercase;
 }
 
 .file-item .file-info {
@@ -889,9 +932,13 @@ textarea {
 }
 
 .file-item .file-name {
-    font-weight: 500;
-    overflow-wrap: break-word;
-    word-break: break-all;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 0.2rem;
 }
 
 .file-item .file-meta {
@@ -899,32 +946,33 @@ textarea {
     color: var(--text-muted);
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    gap: 0.75rem;
 }
 
 .file-item .file-actions {
     display: flex;
-    gap: 0.4rem;
+    gap: 0.5rem;
     flex-shrink: 0;
 }
 
 .file-source-status {
-    font-size: 0.75rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
 
 .file-source-status.online {
-    background: rgba(0, 184, 148, 0.15);
-    color: var(--success);
+    background: rgba(0, 184, 148, 0.1);
+    color: #00b894;
 }
 
 .file-source-status.offline {
-    background: rgba(231, 76, 60, 0.15);
-    color: var(--danger);
+    background: rgba(231, 76, 60, 0.1);
+    color: #e74c3c;
 }
-
 /* --- Transfers --- */
 
 .transfer-list {

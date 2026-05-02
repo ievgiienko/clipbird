@@ -208,6 +208,7 @@ export function renderDownloadAllButton(downloadableCount, batchState) {
     container.appendChild(area);
 }
 
+
 // --- File list ---
 
 export async function renderFileList(files) {
@@ -226,11 +227,23 @@ export async function renderFileList(files) {
         el.dataset.fileCode = file.fileCode;
 
         let fileName = file.fileCode;
+        let previewUrl = null;
+
         try {
-            if (state.cryptoKey && file.encryptedName) {
-                fileName = await decryptString(state.cryptoKey, file.encryptedName, file.encryptedNameIv);
+            if (state.cryptoKey) {
+                // 1. Дешифруем имя файла
+                if (file.encryptedName) {
+                    fileName = await decryptString(state.cryptoKey, file.encryptedName, file.encryptedNameIv);
+                }
+
+                // 2. Дешифруем превью (используем ключи из DTO бэкенда)
+                if (file.encryptedPreview && file.encryptedPreviewIv) {
+                    previewUrl = await decryptString(state.cryptoKey, file.encryptedPreview, file.encryptedPreviewIv);
+                }
             }
-        } catch { /* use fileCode as fallback */ }
+        } catch (err) {
+            console.error("Decryption error:", err);
+        }
 
         const isOwn = file.sourceDeviceId === state.deviceId;
         const sizeStr = formatBytes(file.sizeBytes);
@@ -239,7 +252,15 @@ export async function renderFileList(files) {
                 ? '<span class="file-source-status online">Source online</span>'
                 : '<span class="file-source-status offline">Source offline</span>';
 
+        // Формируем HTML превью с использованием нового контейнера .file-preview-container
+        const previewContent = previewUrl
+            ? `<img src="${previewUrl}" class="file-preview-icon" alt="preview">`
+            : `<div class="file-icon-placeholder">${fileName.split('.').pop().toUpperCase()}</div>`;
+
         el.innerHTML = `
+            <div class="file-preview-container">
+                ${previewContent}
+            </div>
             <div class="file-info">
                 <div class="file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div>
                 <div class="file-meta">

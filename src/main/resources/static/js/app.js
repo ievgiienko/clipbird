@@ -682,11 +682,12 @@ async function sendTextUpdate(text) {
 
 // --- File handling ---
 
-async function processFiles(files) {
-    if (!files || files.length === 0) return;
+async function processFiles(items) {
+    if (!items || items.length === 0) return;
 
     const state = getState();
-    for (const file of files) {
+    for (const item of items) {
+        const { file, thumbnail } = item;
         try {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
@@ -695,12 +696,18 @@ async function processFiles(files) {
                 ? await crypto.encryptString(state.cryptoKey, file.type)
                 : { ciphertext: '', iv: '' };
 
-            // fileHash is computed incrementally during transfer (per-chunk hash-of-hashes)
+            let encThumbnail = { ciphertext: null, iv: null };
+            if (thumbnail) {
+                encThumbnail = await crypto.encryptString(state.cryptoKey, thumbnail);
+            }
+
             const manifest = await api.addFile(state.clipboardCode, {
                 encryptedName: encName.ciphertext,
                 encryptedNameIv: encName.iv,
                 encryptedMime: encMime.ciphertext,
                 encryptedMimeIv: encMime.iv,
+                encryptedThumbnail: encThumbnail.ciphertext,
+                encryptedThumbnailIv: encThumbnail.iv,
                 sizeBytes: file.size,
                 totalChunks,
                 sourceDeviceId: state.deviceId,
@@ -720,11 +727,47 @@ async function processFiles(files) {
     }
 }
 
+
 async function handleFilesSelected(event) {
-    await processFiles(event.target.files);
+    const files = Array.from(event.target.files);
+
+    const filesWithPreviews = await Promise.all(files.map(async (file) => {
+        let thumbnail = null;
+        if (file.type.startsWith('image/')) {
+            thumbnail = await generateThumbnail(file);
+        }
+        return {
+            file: file,
+            thumbnail: thumbnail
+        };
+    }));
+
+    await processFiles(filesWithPreviews);
+
     event.target.value = '';
 }
+async function generateThumbnail(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
 
+                const size = 48;
+                canvas.width = size;
+                canvas.height = size;
+
+                ctx.drawImage(img, 0, 0, size, size);
+
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
 // --- Drag and drop ---
 
 function handleDragEnter(e) {
