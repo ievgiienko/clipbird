@@ -22,6 +22,10 @@ mvn test -Dtest=ClipboardServiceTest#shouldCreateClipboard
 
 # Compile only (no tests, no package)
 mvn compile
+mvn test -Dtest=CleanupServiceTest
+
+# Проверка интеграции с базой (нужен запущенный Docker с MySQL)
+mvn test -Pintegration-tests
 
 # Start with Docker Compose (MySQL + Redis + app)
 bash init-env.sh   # generates .env with random DB passwords
