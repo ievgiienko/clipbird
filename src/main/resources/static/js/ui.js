@@ -3,7 +3,7 @@
  */
 
 import { getState } from './state.js';
-import { decryptString } from './crypto.js';
+import { decryptString, decryptChunkBinary, base64ToBytes } from './crypto.js';
 
 // --- Page navigation ---
 
@@ -238,8 +238,12 @@ export async function renderFileList(files) {
             : file.sourceOnline
                 ? '<span class="file-source-status online">Source online</span>'
                 : '<span class="file-source-status offline">Source offline</span>';
+        const thumbHtml = file.encryptedPreview
+            ? `<img class="file-thumb" alt="">`
+            : '';
 
         el.innerHTML = `
+            ${thumbHtml}
             <div class="file-info">
                 <div class="file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div>
                 <div class="file-meta">
@@ -255,6 +259,23 @@ export async function renderFileList(files) {
             </div>
         `;
         container.appendChild(el);
+
+        if (file.encryptedPreview && state.cryptoKey) {
+            void (async () => {
+                try {
+                    const plain = await decryptChunkBinary(state.cryptoKey, base64ToBytes(file.encryptedPreview), base64ToBytes(file.encryptedPreviewIv));
+                    const blob = new Blob([plain], { type: 'image/jpeg' });
+                    const url = URL.createObjectURL(blob);
+                    const imgEl = el.querySelector('.file-thumb');
+                    if (imgEl && document.contains(el)) {
+                        imgEl.src = url;
+                        imgEl.onload = () => URL.revokeObjectURL(url);
+                    } else {
+                        URL.revokeObjectURL(url);
+                    }
+                } catch { /* ignore decryption errors */ }
+            })();
+        }
     }
 }
 

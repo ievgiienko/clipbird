@@ -909,6 +909,14 @@ textarea {
     flex-shrink: 0;
 }
 
+.file-thumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
 .file-source-status {
     font-size: 0.75rem;
     padding: 0.15rem 0.5rem;
