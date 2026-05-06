@@ -682,6 +682,29 @@ async function sendTextUpdate(text) {
 
 // --- File handling ---
 
+async function generateThumbnail(file) {
+    if (!file.type.startsWith('image/')) return null;
+    return new Promise((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            const SIZE = 64;
+            const scale = Math.min(SIZE / img.width, SIZE / img.height, 1);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => {
+                if (blob) blob.arrayBuffer().then(resolve).catch(() => resolve(null));
+                else resolve(null);
+            }, 'image/jpeg', 0.7);
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        img.src = url;
+    });
+}
+
 async function processFiles(files) {
     if (!files || files.length === 0) return;
 
@@ -695,6 +718,15 @@ async function processFiles(files) {
                 ? await crypto.encryptString(state.cryptoKey, file.type)
                 : { ciphertext: '', iv: '' };
 
+            let encryptedPreview = null;
+            let encryptedPreviewIv = null;
+            const thumbBytes = await generateThumbnail(file);
+            if (thumbBytes) {
+                const encThumb = await crypto.encryptChunkBinary(state.cryptoKey, thumbBytes);
+                encryptedPreview = crypto.bytesToBase64(new Uint8Array(encThumb.data));
+                encryptedPreviewIv = crypto.bytesToBase64(encThumb.iv);
+            }
+
             // fileHash is computed incrementally during transfer (per-chunk hash-of-hashes)
             const manifest = await api.addFile(state.clipboardCode, {
                 encryptedName: encName.ciphertext,
@@ -704,7 +736,9 @@ async function processFiles(files) {
                 sizeBytes: file.size,
                 totalChunks,
                 sourceDeviceId: state.deviceId,
-                fileHash: null
+                fileHash: null,
+                encryptedPreview,
+                encryptedPreviewIv
             });
 
             await fileStore.storeFile(manifest.fileCode, file);
