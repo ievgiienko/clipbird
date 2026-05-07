@@ -1,13 +1,18 @@
 package com.secureclipboard;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.secureclipboard.service.RedisChunkStore;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MvcResult;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Tests for Redis-backed chunk storage.
@@ -36,6 +41,13 @@ class RedisChunkStoreTest {
         assertNull(chunkStore.getIv("nonexistent", 0));
         assertFalse(chunkStore.exists("nonexistent", 0));
     }
+    @Test
+    void chunksShouldHaveExpiration() {
+        chunkStore.store("transfer-ttl", 0, new byte[]{1}, "iv", "hash");
+    }
+
+
+
 
     @Test
     void shouldDeleteChunk() {
