@@ -99,7 +99,6 @@ class ClipboardControllerTest {
             .andExpect(jsonPath("$.files").isArray())
             .andExpect(jsonPath("$.connectedDevices").value(0));
     }
-
     @Test
     void shouldDeleteClipboard() throws Exception {
         MvcResult createResult = mockMvc.perform(post("/api/clipboards")
@@ -132,6 +131,20 @@ class ClipboardControllerTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.expiresAt").isNotEmpty());
     }
+    @Test
+    void shouldProvideDataConsistentWithQrCodeRequirements() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/clipboards")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
+        String code = response.get("clipboardCode").asText();
+    }
+
+
+
+
 
     @Test
     void shouldRejectInvalidTtl() throws Exception {
