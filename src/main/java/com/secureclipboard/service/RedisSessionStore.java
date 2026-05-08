@@ -19,6 +19,7 @@ import java.util.Set;
  *   cb:presence:{clipboardCode}              → Hash { deviceId → lastSeen ISO instant }
  *   cb:ws:{sessionId}                        → Hash { "deviceId" → ..., "clipboardCode" → ... }
  */
+
 @Service
 public class RedisSessionStore {
 
