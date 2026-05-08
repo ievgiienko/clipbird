@@ -123,6 +123,16 @@ class ClipboardControllerTest {
         mockMvc.perform(get("/api/clipboards/NONEXIST/handshake"))
             .andExpect(status().isBadRequest());
     }
+    @Test
+    void shouldProvideDataConsistentWithQrCodeRequirements() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/clipboards")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
+        String code = response.get("clipboardCode").asText();
+    }
 
     @Test
     void shouldCreateClipboardWithCustomTtl() throws Exception {
