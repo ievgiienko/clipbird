@@ -11,5 +11,7 @@ public record FileManifestDto(
     int totalChunks,
     String sourceDeviceId,
     boolean sourceOnline,
-    String fileHash
+    String fileHash,
+    String encryptedPreview,
+    String encryptedPreviewIv
 ) {}
