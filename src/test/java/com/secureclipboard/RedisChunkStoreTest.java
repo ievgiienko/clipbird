@@ -59,6 +59,10 @@ class RedisChunkStoreTest {
         assertFalse(chunkStore.exists("transfer-3", 1));
         assertFalse(chunkStore.exists("transfer-3", 2));
     }
+    @Test
+    void chunksShouldHaveExpiration() {
+        chunkStore.store("transfer-ttl", 0, new byte[]{1}, "iv", "hash");
+    }
 
     @Test
     void shouldStoreBinaryDataWithoutCorruption() {
