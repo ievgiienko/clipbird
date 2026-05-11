@@ -7,7 +7,7 @@
  * - Adaptive chunk sizing: measures throughput on first chunk, adjusts for remaining
  * - Binary transport: encrypted chunks sent as raw bytes, not base64 JSON
  */
-
+console.log('1');
 import * as crypto from './crypto.js';
 import * as api from './api.js';
 import * as auth from './auth.js';
@@ -23,6 +23,10 @@ import { initTheme } from './theme.js';
 import { initPwa } from './pwa.js';
 import * as fileWriter from './file-writer.js';
 
+
+
+console.log('APPLOADED');
+
 const CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB default
 const TEXT_DEBOUNCE_MS = 500;
 
@@ -36,6 +40,7 @@ let ws = null;
 // --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', () => {
+  
     initTheme();
     initPwa();
     fileWriter.cleanupOrphans();
@@ -48,10 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
     router.init(onRouteChange);
 });
 
+
+
 function getSelectedTtl() {
     const active = document.querySelector('#ttl-selector .ttl-option.active');
     return active ? parseInt(active.dataset.ttl, 10) : 24;
 }
+
 
 function bindEvents() {
     // Create page
@@ -70,6 +78,7 @@ function bindEvents() {
         });
     });
 
+
     // Open page
     document.getElementById('btn-open').addEventListener('click', handleOpen);
     onEnterKey('open-password', handleOpen);
@@ -77,6 +86,7 @@ function bindEvents() {
     // URL-based open (clipboard locked state)
     document.getElementById('btn-url-open').addEventListener('click', handleUrlOpen);
     onEnterKey('url-password', handleUrlOpen);
+
 
     // Clipboard page
     document.getElementById('btn-delete').addEventListener('click', () => ui.showDeleteModal());
@@ -100,6 +110,7 @@ function bindEvents() {
     dropZone.addEventListener('dragover', handleDragOver);
     dropZone.addEventListener('dragleave', handleDragLeave);
     dropZone.addEventListener('drop', handleDrop);
+
 
     // Delegate file/transfer action clicks
     document.getElementById('file-list').addEventListener('click', handleFileAction);
@@ -144,7 +155,9 @@ function bindEvents() {
             ui.hideDeleteModal();
         }
     });
+
 }
+
 
 function onEnterKey(inputId, handler) {
     document.getElementById(inputId).addEventListener('keydown', (e) => {
@@ -157,36 +170,47 @@ function onEnterKey(inputId, handler) {
 async function onRouteChange(route) {
     const state = getState();
 
+
     // Clean up WS and overlays if navigating away from clipboard
+
+    
     if (route.page !== 'clipboard') {
-        if (ws) { ws.disconnect(); ws = null; }
+      
+        if(ws){
+            ws.disconnect();
+            ws=null;
+        }
+        resetState();
+        await fileStore.clearAll();
+        ui.renderFileList([]);
         ui.hideDeletedOverlay();
     }
 
     if (route.page === 'clipboard' && route.code) {
+
+     
         // Trusted-device flow: read password from URL fragment and strip it immediately.
         // The fragment is never sent to the server (RFC 3986).
         // replaceState removes it from the address bar and current history entry.
         const fragmentPassword = readAndStripFragment();
 
-        if (state.clipboardCode === route.code && state.cryptoKey) {
+
+        if ( state.clipboardCode === route.code && state.cryptoKey) {
             // Already authenticated for this clipboard
-            ui.showUnlockedState(route.code);
+
+         
             showViewPasswordButton();
 
+        }
 
 
-        } else if (fragmentPassword) {
+         else if (fragmentPassword) {
             // Auto-authenticate using password from QR fragment
             autoOpenFromFragment(route.code, fragmentPassword);
         } else {
             // Need password — show manual entry
             ui.showLockedState(route.code);
-
-
         }
-
-
     }
 
     if (route.page === 'dashboard') {
@@ -219,6 +243,7 @@ async function onRouteChange(route) {
     }
 }
 
+ 
 // --- Fragment handling (trusted-device flow) ---
 
 /**
@@ -227,6 +252,9 @@ async function onRouteChange(route) {
  * The fragment is never sent to the server (RFC 3986).
  * replaceState removes it from the address bar and current history entry.
  */
+
+
+
 function readAndStripFragment() {
     const hash = window.location.hash;
     if (!hash || hash.length <= 1) return null;
@@ -256,6 +284,7 @@ async function autoOpenFromFragment(code, password) {
 }
 
 // --- Generate random password ---
+
 
 function generateRandomPassword() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_~.';
@@ -320,6 +349,7 @@ async function handleCreate() {
             passwordHash,
             cryptoKey: key,
             salt: result.salt,
+            generatedPassword: null,
         });
 
         // Navigate to clipboard page
@@ -489,6 +519,7 @@ async function authenticateAndOpen(code, password, errorElementId) {
             passwordHash,
             cryptoKey: key,
             salt: handshake.salt,
+            generatedPassword: null,
         });
 
         // Navigate to clipboard page (if not already there)
@@ -696,10 +727,46 @@ async function sendTextUpdate(text) {
 
 // --- File handling ---
 
+async function generateThumbnail(file) {
+    if (!file.type.startsWith('image/')) return null;
+    return new Promise((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            const SIZE = 64;
+            const scale = Math.min(SIZE / img.width, SIZE / img.height, 1);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => {
+                if (blob) blob.arrayBuffer().then(resolve).catch(() => resolve(null));
+                else resolve(null);
+            }, 'image/jpeg', 0.7);
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        img.src = url;
+    });
+}
+
 async function processFiles(files) {
     if (!files || files.length === 0) return;
 
     const state = getState();
+    if (!state.cryptoKey) {
+
+        console.error('NO CRYPTO KEY');
+    
+        alert('Подожди секунду и попробуй снова');
+    
+        return;
+    
+      }
+    
+     
+    
+        
     for (const file of files) {
         try {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
@@ -708,6 +775,15 @@ async function processFiles(files) {
             const encMime = file.type
                 ? await crypto.encryptString(state.cryptoKey, file.type)
                 : { ciphertext: '', iv: '' };
+
+            let encryptedPreview = null;
+            let encryptedPreviewIv = null;
+            const thumbBytes = await generateThumbnail(file);
+            if (thumbBytes) {
+                const encThumb = await crypto.encryptChunkBinary(state.cryptoKey, thumbBytes);
+                encryptedPreview = crypto.bytesToBase64(new Uint8Array(encThumb.data));
+                encryptedPreviewIv = crypto.bytesToBase64(encThumb.iv);
+            }
 
             // fileHash is computed incrementally during transfer (per-chunk hash-of-hashes)
             const manifest = await api.addFile(state.clipboardCode, {
@@ -718,7 +794,9 @@ async function processFiles(files) {
                 sizeBytes: file.size,
                 totalChunks,
                 sourceDeviceId: state.deviceId,
-                fileHash: null
+                fileHash: null,
+                encryptedPreview,
+                encryptedPreviewIv
             });
 
             await fileStore.storeFile(manifest.fileCode, file);
@@ -1367,6 +1445,7 @@ function cleanupAndGoHome() {
     ui.setTextVersion(0);
     ui.setConnectionStatus(false);
     ui.setDeviceCount(0);
+    hidePasswordModal();
     ui.hideDeletedOverlay();
     router.navigate('/');
 }
@@ -1401,4 +1480,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+
+
+
+
+
+
+
   

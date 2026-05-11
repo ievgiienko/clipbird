@@ -135,7 +135,7 @@ class ClipboardServiceTest {
         String expectedHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
 
         FileManifestDto manifest = clipboardService.addFile(code, new AddFileRequest(
-            "enc-name", "enc-iv", "", "", 1000, 1, "source-dev", expectedHash
+            "enc-name", "enc-iv", "", "", 1000, 1, "source-dev", expectedHash, null, null
         ));
 
         assertEquals(expectedHash, manifest.fileHash());
@@ -174,9 +174,37 @@ class ClipboardServiceTest {
         sessionManager.join(code, "source-dev", mockSession);
 
         FileManifestDto manifest = clipboardService.addFile(code, new AddFileRequest(
-            "enc-name", "enc-iv", "", "", 1000, 1, "source-dev", null
+            "enc-name", "enc-iv", "", "", 1000, 1, "source-dev", null, null, null
         ));
 
         assertNull(manifest.fileHash());
+    }
+
+    @Test
+    void shouldStoreAndReturnEncryptedPreview() {
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        String code = created.clipboardCode();
+        clipboardService.setPasswordHash(code, "hash");
+
+        WebSocketSession mockSession = mock(WebSocketSession.class);
+        when(mockSession.getId()).thenReturn("sess-" + UUID.randomUUID());
+        when(mockSession.isOpen()).thenReturn(true);
+        sessionManager.join(code, "source-dev", mockSession);
+
+        String previewData = "base64encryptedthumbnaildata==";
+        String previewIv = "base64previewiv==";
+
+        FileManifestDto manifest = clipboardService.addFile(code, new AddFileRequest(
+            "enc-name", "enc-iv", "enc-mime", "enc-mime-iv", 500000, 1, "source-dev", null,
+            previewData, previewIv
+        ));
+
+        assertEquals(previewData, manifest.encryptedPreview());
+        assertEquals(previewIv, manifest.encryptedPreviewIv());
+
+        ClipboardStateResponse state = clipboardService.getState(code);
+        assertEquals(1, state.files().size());
+        assertEquals(previewData, state.files().get(0).encryptedPreview());
+        assertEquals(previewIv, state.files().get(0).encryptedPreviewIv());
     }
 }

@@ -9,6 +9,7 @@ const state = {
     passwordHash: null,
     cryptoKey: null,
     salt: null,
+    generatedPassword: null,
     deviceId: null,
 
     // Clipboard data
