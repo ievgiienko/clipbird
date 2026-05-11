@@ -1,6 +1,6 @@
 /**
  * Simple SPA router using the History API.
- * Routes: /, /create, /open, /c/{clipboardCode}
+ * Routes: /, /create, /open, /c/{clipboardCode}, /login, /register, /dashboard
  */
 
 let onRouteChange = null;
@@ -31,8 +31,11 @@ export function getRoute() {
 }
 
 function parseRoute(path) {
-    if (path === '/create') return { page: 'create' };
-    if (path === '/open') return { page: 'open' };
+    if (path === '/create')    return { page: 'create' };
+    if (path === '/open')      return { page: 'open' };
+    if (path === '/login')     return { page: 'login' };
+    if (path === '/register')  return { page: 'register' };
+    if (path === '/dashboard') return { page: 'dashboard' };
     const clipMatch = path.match(/^\/c\/([A-Za-z0-9]+)$/);
     if (clipMatch) return { page: 'clipboard', code: clipMatch[1] };
     return { page: 'landing' };
@@ -46,10 +49,13 @@ function handleRoute() {
 
     // Show target page
     const pageMap = {
-        landing: 'landing-page',
-        create: 'create-page',
-        open: 'open-page',
+        landing:   'landing-page',
+        create:    'create-page',
+        open:      'open-page',
         clipboard: 'clipboard-page',
+        login:     'login-page',
+        register:  'register-page',
+        dashboard: 'dashboard-page',
     };
     const pageEl = document.getElementById(pageMap[route.page] || 'landing-page');
     if (pageEl) pageEl.classList.add('active');
