@@ -678,10 +678,6 @@ textarea {
     background: var(--danger-hover);
 }
 
-.btn-small {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
-}
 
 .btn-large {
     padding: 0.85rem 2rem;
@@ -1094,6 +1090,14 @@ textarea {
 .file-item .file-actions {
     display: flex;
     gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.file-thumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 4px;
     flex-shrink: 0;
 }
 

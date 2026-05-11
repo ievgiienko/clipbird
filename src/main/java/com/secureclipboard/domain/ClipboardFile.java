@@ -45,6 +45,12 @@ public class ClipboardFile {
     @Column(name = "file_hash", length = 64)
     private String fileHash;
 
+    @Column(name = "encrypted_preview", columnDefinition = "TEXT")
+    private String encryptedPreview;
+
+    @Column(name = "encrypted_preview_iv", length = 64)
+    private String encryptedPreviewIv;
+
     @Column(nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
     private FileStatus status = FileStatus.AVAILABLE;
@@ -95,6 +101,12 @@ public class ClipboardFile {
 
     public String getFileHash() { return fileHash; }
     public void setFileHash(String fileHash) { this.fileHash = fileHash; }
+
+    public String getEncryptedPreview() { return encryptedPreview; }
+    public void setEncryptedPreview(String encryptedPreview) { this.encryptedPreview = encryptedPreview; }
+
+    public String getEncryptedPreviewIv() { return encryptedPreviewIv; }
+    public void setEncryptedPreviewIv(String encryptedPreviewIv) { this.encryptedPreviewIv = encryptedPreviewIv; }
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
