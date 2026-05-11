@@ -1,10 +1,13 @@
 package com.secureclipboard.controller;
 
+import com.secureclipboard.domain.User;
 import com.secureclipboard.dto.*;
+import com.secureclipboard.service.AuthService;
 import com.secureclipboard.service.ClipboardService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -12,15 +15,19 @@ import org.springframework.web.bind.annotation.*;
 public class ClipboardController {
 
     private final ClipboardService clipboardService;
+    private final AuthService authService;
 
-    public ClipboardController(ClipboardService clipboardService) {
+    public ClipboardController(ClipboardService clipboardService, AuthService authService) {
         this.clipboardService = clipboardService;
+        this.authService = authService;
     }
 
     @PostMapping
     public ResponseEntity<ClipboardCreatedResponse> createClipboard(
-            @RequestBody(required = false) CreateClipboardRequest request) {
-        ClipboardCreatedResponse response = clipboardService.createClipboard(request);
+            @RequestBody(required = false) CreateClipboardRequest request,
+            Authentication authentication) {
+        User owner = resolveUser(authentication);
+        ClipboardCreatedResponse response = clipboardService.createClipboard(request, owner);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -54,9 +61,19 @@ public class ClipboardController {
     }
 
     @DeleteMapping("/{clipboardCode}")
-    public ResponseEntity<Void> deleteClipboard(@PathVariable String clipboardCode) {
-        clipboardService.deleteClipboard(clipboardCode);
+    public ResponseEntity<Void> deleteClipboard(@PathVariable String clipboardCode,
+                                                 Authentication authentication) {
+        User requestingUser = resolveUser(authentication);
+        clipboardService.deleteClipboard(clipboardCode, requestingUser);
         return ResponseEntity.noContent().build();
+    }
+
+    private User resolveUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
+            return null;
+        }
+        return authService.findByEmail(authentication.getName());
     }
 
     @PostMapping("/{clipboardCode}/files")

@@ -2,6 +2,9 @@ package com.secureclipboard.repository;
 
 import com.secureclipboard.domain.Clipboard;
 import com.secureclipboard.domain.ClipboardStatus;
+import com.secureclipboard.domain.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -27,6 +30,10 @@ public interface ClipboardRepository extends JpaRepository<Clipboard, Long> {
     void updateStatus(Long id, ClipboardStatus status);
 
     List<Clipboard> findByStatusInAndExpiresAtBefore(List<ClipboardStatus> statuses, Instant cutoff);
+
+    // --- User dashboard ---
+
+    Page<Clipboard> findByOwnerAndStatusNot(User owner, ClipboardStatus excludedStatus, Pageable pageable);
 
     // --- Stats ---
 

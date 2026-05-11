@@ -527,6 +527,7 @@ h2 {
 
 input[type="text"],
 input[type="password"],
+input[type="email"],
 textarea {
     width: 100%;
     padding: 0.75rem 1rem;
@@ -715,6 +716,193 @@ textarea {
     margin-bottom: 1rem;
     flex-wrap: wrap;
     gap: 0.75rem;
+}
+
+/* --- Auth pages (login / register) --- */
+
+.auth-switch {
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-top: 1.25rem;
+}
+
+.auth-switch a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.auth-switch a:hover {
+    text-decoration: underline;
+}
+
+/* --- Dashboard --- */
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.75rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.dashboard-header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+}
+
+.dashboard-subtitle {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.dashboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 1.5rem;
+}
+
+.clipboard-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s;
+}
+
+.clipboard-card:hover {
+    border-color: var(--primary);
+}
+
+.clipboard-card-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.clipboard-card-code {
+    font-family: var(--mono);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+    letter-spacing: 0.03em;
+}
+
+.clipboard-card-code:hover {
+    color: var(--primary);
+}
+
+.clipboard-card-meta {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 0.3rem;
+}
+
+.clipboard-card-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.clipboard-card-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+/* Status badges */
+
+.status-badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-badge.active  { background: rgba(0, 184, 148, 0.12); color: var(--success); }
+.status-badge.expired { background: rgba(231, 76, 60, 0.1);  color: var(--danger); }
+.status-badge.deleted { background: var(--surface-hover);     color: var(--text-muted); }
+
+/* Pagination */
+
+.pagination {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: center;
+    align-items: center;
+    padding: 0.75rem 0 1.5rem;
+    flex-wrap: wrap;
+}
+
+.pagination button {
+    padding: 0.35rem 0.8rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: var(--font);
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.pagination button:hover:not(:disabled) {
+    background: var(--surface-hover);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.pagination button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.pagination button.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.pagination-info {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-right: 0.4rem;
+}
+
+/* Empty and loading states */
+
+.empty-state {
+    text-align: center;
+    padding: 3.5rem 1rem;
+    color: var(--text-muted);
+}
+
+.empty-state-icon {
+    margin-bottom: 1rem;
+    opacity: 0.4;
+}
+
+.empty-state p {
+    font-size: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.loading-state {
+    text-align: center;
+    padding: 2.5rem;
+    color: var(--text-muted);
+    font-size: 0.95rem;
 }
 
 .clipboard-title {
@@ -1350,6 +1538,7 @@ textarea {
 
 [data-theme="light"] input[type="text"],
 [data-theme="light"] input[type="password"],
+[data-theme="light"] input[type="email"],
 [data-theme="light"] textarea {
     background: var(--bg);
 }
@@ -1368,6 +1557,7 @@ body,
 .nav-link,
 input[type="text"],
 input[type="password"],
+input[type="email"],
 textarea,
 .drop-zone,
 .status,

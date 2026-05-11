@@ -54,6 +54,14 @@
             <nav class="site-nav">
                 <a href="/create" data-link class="nav-link">Create</a>
                 <a href="/open" data-link class="nav-link">Open</a>
+                <span id="nav-guest" style="display:none">
+                    <a href="/login" data-link class="nav-link">Sign in</a>
+                </span>
+                <span id="nav-user" style="display:none; align-items:center; gap:0.25rem">
+                    <a href="/dashboard" data-link class="nav-link">Dashboard</a>
+                    <button id="btn-nav-logout" class="nav-link link-btn" style="border:none;background:none;cursor:pointer;font-size:0.9rem;font-weight:500;color:var(--text-muted);padding:0.4rem 0.75rem;border-radius:var(--radius)">Sign out</button>
+                    <span id="nav-user-email" class="nav-link" style="cursor:default;font-size:0.8rem;opacity:0.7;padding:0.4rem 0.5rem"></span>
+                </span>
                 <div class="theme-toggle" id="theme-toggle" role="radiogroup" aria-label="Theme">
                     <button class="theme-toggle-option" data-theme-value="light" aria-label="Light theme" title="Light theme">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -364,6 +372,71 @@
             <h2>Clipboard Deleted</h2>
             <p>This clipboard has been permanently deleted.</p>
             <button id="btn-deleted-go-home" class="btn btn-primary">Go Home</button>
+        </div>
+    </div>
+
+    <!-- Login Page -->
+    <div id="login-page" class="page">
+        <div class="container container-narrow">
+            <a href="/" data-link class="back-link">&larr; Back to Home</a>
+            <div class="card">
+                <h2>Sign in to ClipBird</h2>
+                <p class="card-desc">Access your clipboard history and saved sessions.</p>
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="Your password" autocomplete="current-password">
+                </div>
+                <button id="btn-login" class="btn btn-primary btn-full">Sign in</button>
+                <p class="auth-switch">No account? <a href="/register" data-link>Create one</a></p>
+            </div>
+            <div id="login-error" class="error-box" style="display:none"></div>
+        </div>
+    </div>
+
+    <!-- Register Page -->
+    <div id="register-page" class="page">
+        <div class="container container-narrow">
+            <a href="/" data-link class="back-link">&larr; Back to Home</a>
+            <div class="card">
+                <h2>Create an account</h2>
+                <p class="card-desc">Save your clipboard history and access it from any device.</p>
+                <div class="form-group">
+                    <label for="reg-email">Email</label>
+                    <input type="email" id="reg-email" placeholder="you@example.com" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">Password</label>
+                    <input type="password" id="reg-password" placeholder="At least 8 characters" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label for="reg-password-confirm">Confirm password</label>
+                    <input type="password" id="reg-password-confirm" placeholder="Confirm your password" autocomplete="new-password">
+                </div>
+                <button id="btn-register" class="btn btn-primary btn-full">Create Account</button>
+                <p class="auth-switch">Already have an account? <a href="/login" data-link>Sign in</a></p>
+            </div>
+            <div id="register-error" class="error-box" style="display:none"></div>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboard-page" class="page">
+        <div class="container">
+            <div class="dashboard-header">
+                <div>
+                    <h1>My Clipboards</h1>
+                    <p id="dashboard-email" class="dashboard-subtitle"></p>
+                </div>
+                <button id="btn-dashboard-logout" class="btn btn-secondary btn-small">Sign out</button>
+            </div>
+            <div id="dashboard-list" class="dashboard-list">
+                <div class="loading-state">Loading…</div>
+            </div>
+            <div id="dashboard-pagination" class="pagination" style="display:none"></div>
         </div>
     </div>
 
