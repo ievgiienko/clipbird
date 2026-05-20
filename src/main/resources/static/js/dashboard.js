@@ -19,7 +19,7 @@ export async function show(user) {
     await loadPage(0);
 
     document.getElementById('btn-dashboard-logout')?.addEventListener('click', async () => {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include'});
         window.location.reload();
     });
 }
@@ -36,7 +36,7 @@ async function loadPage(page) {
 
     const pageSize = 20;
     try {
-        const res = await fetch(`/api/users/me/clipboards?page=${page}&size=${pageSize}`);
+        const res = await fetch(`/api/users/me/clipboards?page=${page}&size=${pageSize}`, { credentials: 'include' });
         if (!res.ok) { listEl.innerHTML = '<div class="loading-state">Failed to load clipboards.</div>'; return; }
 
         const data = await res.json();
@@ -126,7 +126,7 @@ async function handleDelete(code) {
     if (!confirm(`Delete clipboard ${code}? This cannot be undone.`)) return;
 
     try {
-        const res = await fetch(`/api/clipboards/${encodeURIComponent(code)}`, { method: 'DELETE' });
+        const res = await fetch(`/api/clipboards/${encodeURIComponent(code)}`, { method: 'DELETE', credentials: 'include' });
         if (!res.ok && res.status !== 204) throw new Error('Delete failed');
         // Remove card immediately, then reload current page
         document.querySelector(`[data-code="${esc(code)}"]`)?.remove();

@@ -64,8 +64,12 @@ public class ClipboardController {
     public ResponseEntity<Void> deleteClipboard(@PathVariable String clipboardCode,
                                                  Authentication authentication) {
         User requestingUser = resolveUser(authentication);
-        clipboardService.deleteClipboard(clipboardCode, requestingUser);
-        return ResponseEntity.noContent().build();
+        try {
+            clipboardService.deleteClipboard(clipboardCode, requestingUser);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     private User resolveUser(Authentication authentication) {

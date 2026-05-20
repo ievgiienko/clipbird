@@ -7,6 +7,7 @@ const BASE_URL = '/api';
 async function request(method, path, body = null) {
     const opts = {
         method,
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
     };
     if (body) opts.body = JSON.stringify(body);
@@ -84,6 +85,7 @@ export async function uploadChunk(transferCode, chunkNo, data, iv, hash) {
 
     const res = await fetch(`${BASE_URL}/transfers/${transferCode}/chunks/${chunkNo}`, {
         method: 'PUT',
+        credentials: 'include',
         body: formData
     });
 
@@ -98,7 +100,9 @@ export async function uploadChunk(transferCode, chunkNo, data, iv, hash) {
  * Returns { data: ArrayBuffer, iv: string (base64), lastChunk: boolean, chunkNo: number }
  */
 export async function downloadChunk(transferCode, chunkNo) {
-    const res = await fetch(`${BASE_URL}/transfers/${transferCode}/chunks/${chunkNo}`);
+    const res = await fetch(`${BASE_URL}/transfers/${transferCode}/chunks/${chunkNo}`, {
+        credentials: 'include'
+    });
 
     if (!res.ok) {
         const err = await res.json().catch(() => ({ message: res.statusText }));
