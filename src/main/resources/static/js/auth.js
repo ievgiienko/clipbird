@@ -7,7 +7,9 @@
 
 export async function getCurrentUser() {
     try {
-        const res = await fetch('/api/auth/me');
+        const res = await fetch('/api/auth/me', {
+            credentials: 'include'
+        });
         if (!res.ok || res.status === 204) return null;
         return res.json();
     } catch {
@@ -18,6 +20,7 @@ export async function getCurrentUser() {
 async function apiLogin(email, password) {
     const res = await fetch('/api/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
     });
@@ -28,6 +31,7 @@ async function apiLogin(email, password) {
 async function apiRegister(email, password) {
     const res = await fetch('/api/auth/register', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
     });
@@ -40,7 +44,7 @@ async function apiRegister(email, password) {
 }
 
 export async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
 }
 
 // Nav auth state
