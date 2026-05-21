@@ -293,7 +293,128 @@ class TransferServiceTest {
         TransferResponse afterCheck = transferService.getTransfer(transfer.transferCode());
         assertEquals("COMPLETED", afterCheck.status());
     }
+    // Checks that the service rejects a chunk
+// with an unexpected sequence number.
+    @Test
+    void shouldRejectChunkWithUnexpectedSequenceNumber() {
+        TransferResponse transfer = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device")
+        );
 
+        assertThrows(IllegalStateException.class, () ->
+                transferService.uploadChunk(
+                        transfer.transferCode(),
+                        1,
+                        new byte[]{1},
+                        "iv-1",
+                        "h1"
+                )
+        );
+    }
+
+    // Checks that the same chunk acknowledgement
+// cannot be processed twice.
+    @Test
+    void shouldRejectDuplicateAcknowledgement() {
+        TransferResponse transfer = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device")
+        );
+
+        transferService.uploadChunk(
+                transfer.transferCode(),
+                0,
+                new byte[]{1},
+                "iv0",
+                "h0"
+        );
+
+        transferService.acknowledgeChunk(transfer.transferCode());
+
+        assertThrows(IllegalStateException.class, () ->
+                transferService.acknowledgeChunk(transfer.transferCode())
+        );
+    }
+
+    // Checks that uploading new chunks
+// is forbidden after transfer completion.
+    @Test
+    void shouldRejectUploadAfterTransferCompleted() {
+        TransferResponse transfer = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device")
+        );
+
+        for (int i = 0; i < 3; i++) {
+            transferService.uploadChunk(
+                    transfer.transferCode(),
+                    i,
+                    new byte[]{(byte) i},
+                    "iv-" + i,
+                    "h" + i
+            );
+
+            transferService.acknowledgeChunk(transfer.transferCode());
+        }
+
+        assertThrows(IllegalStateException.class, () ->
+                transferService.uploadChunk(
+                        transfer.transferCode(),
+                        3,
+                        new byte[]{9},
+                        "iv3",
+                        "h3"
+                )
+        );
+    }
+
+    // Checks that an existing chunk
+// cannot be overwritten.
+    @Test
+    void shouldRejectOverwritingExistingChunk() {
+        TransferResponse transfer = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device")
+        );
+
+        transferService.uploadChunk(
+                transfer.transferCode(),
+                0,
+                new byte[]{1},
+                "iv0",
+                "h0"
+        );
+
+        assertThrows(IllegalStateException.class, () ->
+                transferService.uploadChunk(
+                        transfer.transferCode(),
+                        0,
+                        new byte[]{2},
+                        "iv1",
+                        "h1"
+                )
+        );
+    }
+
+    // Checks that a chunk cannot be downloaded
+// after it has been acknowledged.
+    @Test
+    void shouldRejectDownloadAfterChunkAcknowledged() {
+        TransferResponse transfer = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device")
+        );
+
+        transferService.uploadChunk(
+                transfer.transferCode(),
+                0,
+                new byte[]{10},
+                "iv0",
+                "h0"
+        );
+
+        transferService.acknowledgeChunk(transfer.transferCode());
+
+        assertThrows(IllegalArgumentException.class, () ->
+                transferService.downloadChunk(transfer.transferCode(), 0)
+        );
+    }
     @Test
     void shouldSequentiallyTransferAllChunks() {
         TransferResponse transfer = transferService.createTransfer(

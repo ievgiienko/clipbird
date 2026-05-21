@@ -140,6 +140,96 @@ class TransferControllerTest {
         byte[] downloadedData = downloadResult.getResponse().getContentAsByteArray();
         assertArrayEquals(chunkData, downloadedData);
     }
+    // Checks that requesting a chunk with an invalid chunk number
+// returns HTTP 400 Bad Request.
+    @Test
+    void shouldReturn400ForWrongChunkNumber() throws Exception {
+
+        String body = objectMapper.writeValueAsString(
+                new java.util.HashMap<>() {{
+                    put("clipboardCode", clipboardCode);
+                    put("fileCode", fileCode);
+                    put("targetDeviceId", "target-dev");
+                }}
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/transfers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String transferCode =
+                objectMapper.readTree(result.getResponse().getContentAsString())
+                        .get("transferCode").asText();
+
+        mockMvc.perform(get("/api/transfers/{tc}/chunks/{cn}", transferCode, 999))
+                .andExpect(status().isBadRequest());
+    }
+
+    // Checks that uploading chunks after transfer completion
+// is rejected by the API.
+    @Test
+    void shouldRejectUploadAfterCompletion() throws Exception {
+
+        String body = objectMapper.writeValueAsString(
+                new java.util.HashMap<>() {{
+                    put("clipboardCode", clipboardCode);
+                    put("fileCode", fileCode);
+                    put("targetDeviceId", "target-dev");
+                }}
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/transfers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andReturn();
+
+        String transferCode =
+                objectMapper.readTree(result.getResponse().getContentAsString())
+                        .get("transferCode").asText();
+
+        byte[] data = new byte[]{1};
+
+        MockMultipartFile dataPart =
+                new MockMultipartFile("data", "c", "application/octet-stream", data);
+
+        MockMultipartFile ivPart =
+                new MockMultipartFile("iv", "", "text/plain", "iv".getBytes());
+
+        mockMvc.perform(multipart("/api/transfers/{tc}/chunks/{cn}", transferCode, 0)
+                        .file(dataPart)
+                        .file(ivPart)
+                        .with(r -> { r.setMethod("PUT"); return r; }))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/transfers/{tc}/ack", transferCode))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(multipart("/api/transfers/{tc}/chunks/{cn}", transferCode, 1)
+                        .file(dataPart)
+                        .file(ivPart)
+                        .with(r -> { r.setMethod("PUT"); return r; }))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/transfers/{tc}/ack", transferCode))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(multipart("/api/transfers/{tc}/chunks/{cn}", transferCode, 2)
+                        .file(dataPart)
+                        .file(ivPart)
+                        .with(r -> { r.setMethod("PUT"); return r; }))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/transfers/{tc}/ack", transferCode))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(multipart("/api/transfers/{tc}/chunks/{cn}", transferCode, 3)
+                        .file(dataPart)
+                        .file(ivPart)
+                        .with(r -> { r.setMethod("PUT"); return r; }))
+                .andExpect(status().isBadRequest());
+    }
 
     @Test
     void shouldDownloadLastChunkWithCorrectHeader() throws Exception {

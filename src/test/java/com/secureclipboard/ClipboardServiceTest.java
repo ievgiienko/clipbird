@@ -179,7 +179,52 @@ class ClipboardServiceTest {
 
         assertNull(manifest.fileHash());
     }
+    // Checks that the service rejects an update
+// when an outdated version is used.
+    @Test
+    void shouldRejectUpdateWithOutdatedVersion() {
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
 
+        String code = created.clipboardCode();
+
+        clipboardService.setPasswordHash(code, "hash");
+
+        clipboardService.updateText(code, "v1".getBytes(), "iv1", -1, "d1");
+        clipboardService.updateText(code, "v2".getBytes(), "iv2", 1, "d2");
+
+        assertThrows(IllegalStateException.class, () ->
+                clipboardService.updateText(code, "old".getBytes(), "iv3", 1, "d3")
+        );
+    }
+
+    // Checks that updates are rejected
+// after the clipboard has been deleted.
+    @Test
+    void shouldRejectUpdateOnDeletedClipboard() {
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+
+        String code = created.clipboardCode();
+
+        clipboardService.setPasswordHash(code, "hash");
+        clipboardService.deleteClipboard(code);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                clipboardService.updateText(code, "data".getBytes(), "iv", -1, "d1")
+        );
+    }
+
+    // Checks that setting an empty password hash
+// is not allowed.
+    @Test
+    void shouldRejectBlankPasswordHash() {
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+
+        String code = created.clipboardCode();
+
+        assertThrows(IllegalArgumentException.class, () ->
+                clipboardService.setPasswordHash(code, "")
+        );
+    }
     @Test
     void shouldStoreAndReturnEncryptedPreview() {
         ClipboardCreatedResponse created = clipboardService.createClipboard(null);
