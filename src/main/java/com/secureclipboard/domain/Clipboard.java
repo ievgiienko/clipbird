@@ -36,6 +36,10 @@ public class Clipboard {
     @Enumerated(EnumType.STRING)
     private ClipboardStatus status = ClipboardStatus.ACTIVE;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User owner;
+
     @OneToOne(mappedBy = "clipboard", fetch = FetchType.LAZY)
     private ClipboardTextSnapshot textSnapshot;
 
@@ -72,6 +76,9 @@ public class Clipboard {
 
     public ClipboardStatus getStatus() { return status; }
     public void setStatus(ClipboardStatus status) { this.status = status; }
+
+    public User getOwner() { return owner; }
+    public void setOwner(User owner) { this.owner = owner; }
 
     public ClipboardTextSnapshot getTextSnapshot() { return textSnapshot; }
     public void setTextSnapshot(ClipboardTextSnapshot textSnapshot) { this.textSnapshot = textSnapshot; }
