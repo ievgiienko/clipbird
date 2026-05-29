@@ -10,6 +10,8 @@
 console.log('1');
 import * as crypto from './crypto.js';
 import * as api from './api.js';
+import * as auth from './auth.js';
+import * as dashboard from './dashboard.js';
 import { ClipboardWebSocket } from './ws.js';
 import * as fileStore from './file-store.js';
 import { getState, setState, resetState, generateDeviceId } from './state.js';
@@ -45,7 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setState({ deviceId: generateDeviceId() });
     bindEvents();
     passwordStrength.bind('create-password', 'password-strength');
- 
+    auth.initNav(router.navigate);
+    auth.initLoginPage(router.navigate);
+    auth.initRegisterPage(router.navigate);
     router.init(onRouteChange);
 });
 
@@ -163,8 +167,7 @@ function onEnterKey(inputId, handler) {
 
 // --- Route change handler ---
 
-  async function onRouteChange(route) {
- 
+async function onRouteChange(route) {
     const state = getState();
 
 
@@ -210,7 +213,16 @@ function onEnterKey(inputId, handler) {
         }
     }
 
-    if ( route.page === 'create') {
+    if (route.page === 'dashboard') {
+        const user = await auth.getCurrentUser();
+        if (!user) {
+            router.navigate('/login');
+            return;
+        }
+        dashboard.show(user);
+    }
+
+    if (route.page === 'create') {
         resetState();
         fileStore.clearAll();
         ui.setTextContent('');

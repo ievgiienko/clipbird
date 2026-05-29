@@ -7,8 +7,12 @@ import com.secureclipboard.repository.*;
 import com.secureclipboard.util.CodeGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -44,7 +48,7 @@ public class ClipboardService {
     private static final List<Integer> ALLOWED_TTL_HOURS = List.of(1, 24, 168);
 
     @Transactional
-    public ClipboardCreatedResponse createClipboard(CreateClipboardRequest request) {
+    public ClipboardCreatedResponse createClipboard(CreateClipboardRequest request, User owner) {
         String code;
         int attempts = 0;
         do {
@@ -67,6 +71,7 @@ public class ClipboardService {
         clipboard.setKdfIterations(600000);
         clipboard.setExpiresAt(expiresAt);
         clipboard.setStatus(ClipboardStatus.ACTIVE);
+        clipboard.setOwner(owner);
         clipboardRepo.save(clipboard);
 
         // Create empty text snapshot
@@ -232,17 +237,37 @@ public class ClipboardService {
     }
 
     @Transactional
-    public void deleteClipboard(String clipboardCode) {
+    public void deleteClipboard(String clipboardCode, User requestingUser) {
         Clipboard clipboard = findActiveClipboard(clipboardCode);
+        User owner = clipboard.getOwner();
+        if (owner != null && (requestingUser == null || !owner.getId().equals(requestingUser.getId()))) {
+            throw new AccessDeniedException("You do not own this clipboard");
+        }
+        doDelete(clipboard);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Clipboard> getClipboardsForUser(User user, Pageable pageable) {
+        return clipboardRepo.findByOwnerAndStatusNot(user, ClipboardStatus.DELETED, pageable);
+    }
+
+    // For system-initiated deletes (WebSocket close) — no ownership check.
+    @Transactional
+    public void deleteClipboard(String clipboardCode) {
+        doDelete(findActiveClipboard(clipboardCode));
+    }
+
+    private void doDelete(Clipboard clipboard) {
         Long clipId = clipboard.getId();
+        String code = clipboard.getClipboardCode();
         clipboard.setTextSnapshot(null);
         clipboard.setStatus(ClipboardStatus.DELETED);
         clipboardRepo.saveAndFlush(clipboard);
         transferRepo.deleteByClipboardId(clipId);
         fileRepo.deleteByClipboardId(clipId);
         textRepo.deleteByClipboardId(clipId);
-        sessionManager.removeRoom(clipboardCode);
-        log.info("Clipboard deleted: {}", clipboardCode);
+        sessionManager.removeRoom(code);
+        log.info("Clipboard deleted: {}", code);
     }
 
     private int resolveTtl(CreateClipboardRequest request) {

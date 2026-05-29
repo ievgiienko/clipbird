@@ -56,7 +56,7 @@ class TransferControllerTest {
 
     @BeforeEach
     void setUp() {
-        var created = clipboardService.createClipboard(null);
+        var created = clipboardService.createClipboard(null, null);
         clipboardCode = created.clipboardCode();
         clipboardService.setPasswordHash(clipboardCode, "testHash");
 

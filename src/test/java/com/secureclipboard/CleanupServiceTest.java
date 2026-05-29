@@ -46,10 +46,10 @@ class CleanupServiceTest {
 
     @Test
     void deletedClipboardNotImmediatelyHardDeleted() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
-        clipboardService.deleteClipboard(code);
+        clipboardService.deleteClipboard(code, null);
 
         // Clipboard row still exists with DELETED status
         Optional<Clipboard> found = clipboardRepository.findByClipboardCode(code);
@@ -65,10 +65,10 @@ class CleanupServiceTest {
 
     @Test
     void deletedClipboardHardDeletedAfterRetentionPeriod() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
-        clipboardService.deleteClipboard(code);
+        clipboardService.deleteClipboard(code, null);
 
         // Simulate that expiresAt is far in the past (beyond retention)
         Clipboard clipboard = clipboardRepository.findByClipboardCode(code).orElseThrow();
@@ -84,7 +84,7 @@ class CleanupServiceTest {
 
     @Test
     void expiredClipboardHardDeletedAfterRetentionPeriod() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -103,7 +103,7 @@ class CleanupServiceTest {
 
     @Test
     void activeClipboardNotHardDeleted() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -122,10 +122,10 @@ class CleanupServiceTest {
 
     @Test
     void hardDeleteFreesClipboardCode() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
-        clipboardService.deleteClipboard(code);
+        clipboardService.deleteClipboard(code, null);
 
         // existsByClipboardCode still returns true before purge
         assertTrue(clipboardRepository.existsByClipboardCode(code));
@@ -145,10 +145,10 @@ class CleanupServiceTest {
 
     @Test
     void purgeIsIdempotent() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
-        clipboardService.deleteClipboard(code);
+        clipboardService.deleteClipboard(code, null);
 
         Clipboard clipboard = clipboardRepository.findByClipboardCode(code).orElseThrow();
         int delay = appProps.getCleanup().getHardDeleteDelayHours();
@@ -166,10 +166,10 @@ class CleanupServiceTest {
         try {
             appProps.getCleanup().setHardDeleteEnabled(false);
 
-            ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+            ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
             String code = created.clipboardCode();
             clipboardService.setPasswordHash(code, "hash");
-            clipboardService.deleteClipboard(code);
+            clipboardService.deleteClipboard(code, null);
 
             Clipboard clipboard = clipboardRepository.findByClipboardCode(code).orElseThrow();
             int delay = appProps.getCleanup().getHardDeleteDelayHours();
@@ -188,7 +188,7 @@ class CleanupServiceTest {
 
     @Test
     void purgeRemovesRemainingChildRecords() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -196,7 +196,7 @@ class CleanupServiceTest {
         clipboardService.updateText(code, "encrypted".getBytes(), "iv123", -1, "device1");
 
         // Soft-delete (this already removes children)
-        clipboardService.deleteClipboard(code);
+        clipboardService.deleteClipboard(code, null);
 
         // Make eligible for purge
         Clipboard clipboard = clipboardRepository.findByClipboardCode(code).orElseThrow();

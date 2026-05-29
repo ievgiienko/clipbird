@@ -36,7 +36,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldCreateClipboard() {
-        ClipboardCreatedResponse response = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse response = clipboardService.createClipboard(null, null);
 
         assertNotNull(response.clipboardCode());
         assertEquals(8, response.clipboardCode().length());
@@ -53,7 +53,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldSetPasswordAndVerify() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
 
         clipboardService.setPasswordHash(code, "testPasswordHash123");
@@ -63,7 +63,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldUpdateAndRetrieveText() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -85,7 +85,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldIncrementVersionOnMultipleUpdates() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -98,11 +98,11 @@ class ClipboardServiceTest {
 
     @Test
     void shouldDeleteClipboard() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
-        clipboardService.deleteClipboard(code);
+        clipboardService.deleteClipboard(code, null);
 
         Clipboard clipboard = clipboardRepository.findByClipboardCode(code).orElse(null);
         assertNotNull(clipboard);
@@ -113,7 +113,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldRejectPasswordSetTwice() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
 
         clipboardService.setPasswordHash(code, "hash1");
@@ -122,7 +122,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldStoreAndReturnFileHash() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
@@ -148,7 +148,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldCreateClipboardWithCustomTtl() {
-        ClipboardCreatedResponse response = clipboardService.createClipboard(new CreateClipboardRequest(1));
+        ClipboardCreatedResponse response = clipboardService.createClipboard(new CreateClipboardRequest(1), null);
 
         Instant expiresAt = Instant.parse(response.expiresAt());
         long minutesUntilExpiry = java.time.Duration.between(Instant.now(), expiresAt).toMinutes();
@@ -159,12 +159,12 @@ class ClipboardServiceTest {
     @Test
     void shouldRejectInvalidTtl() {
         assertThrows(IllegalArgumentException.class,
-            () -> clipboardService.createClipboard(new CreateClipboardRequest(99)));
+            () -> clipboardService.createClipboard(new CreateClipboardRequest(99), null));
     }
 
     @Test
     void shouldAllowNullFileHash() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
