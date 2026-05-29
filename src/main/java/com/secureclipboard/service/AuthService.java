@@ -9,6 +9,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Locale;
 
 @Service
 public class AuthService implements UserDetailsService {
@@ -23,8 +24,9 @@ public class AuthService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new UsernameNotFoundException("No user with email: " + email));
+        String normalizedEmail = normalizeEmail(email);
+        User user = userRepository.findByEmail(normalizedEmail)
+            .orElseThrow(() -> new UsernameNotFoundException("No user with email: " + normalizedEmail));
         return org.springframework.security.core.userdetails.User.builder()
             .username(user.getEmail())
             .password(user.getPasswordHash())
@@ -34,6 +36,7 @@ public class AuthService implements UserDetailsService {
 
     @Transactional
     public UserSummaryResponse register(String email, String password) {
+        email = normalizeEmail(email);
         if (userRepository.existsByEmail(email)) {
             throw new IllegalStateException("Email already registered");
         }
@@ -45,7 +48,11 @@ public class AuthService implements UserDetailsService {
     }
 
     public User findByEmail(String email) {
-        return userRepository.findByEmail(email)
+        return userRepository.findByEmail(normalizeEmail(email))
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + email));
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

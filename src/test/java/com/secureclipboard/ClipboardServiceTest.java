@@ -182,7 +182,7 @@ class ClipboardServiceTest {
 
     @Test
     void shouldStoreAndReturnEncryptedPreview() {
-        ClipboardCreatedResponse created = clipboardService.createClipboard(null);
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
         String code = created.clipboardCode();
         clipboardService.setPasswordHash(code, "hash");
 
