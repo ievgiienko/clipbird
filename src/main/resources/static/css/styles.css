@@ -690,20 +690,26 @@ textarea {
     width: 100%;
 }
 
-.link-btn {
+
+
+
+
+#btn-nav-logout {
     background: none;
     border: none;
-    color: var(--primary);
     cursor: pointer;
-    font-size: inherit;
-    font-family: inherit;
-    text-decoration: underline;
-    padding: 0;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
 }
 
-.link-btn:hover {
-    color: var(--primary-hover);
+#btn-nav-logout:hover{
+    color: var(--text);
+    background: var(--surface-hover);
 }
+
+
+
 
 /* --- Clipboard header --- */
 
