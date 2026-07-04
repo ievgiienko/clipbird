@@ -3,23 +3,25 @@
  * Renders into the static elements already present in #dashboard-page.
  */
 
+import {showDeleteModal} from "./ui.js";
+
 let currentPage = 0;
-let totalPages  = 0;
-let userEmail   = '';
+let totalPages = 0;
+let userEmail = '';
 
 // Public API
 
 export async function show(user) {
     currentPage = 0;
-    totalPages  = 0;
-    userEmail   = user?.email ?? '';
+    totalPages = 0;
+    userEmail = user?.email ?? '';
     const emailEl = document.getElementById('dashboard-email');
     if (emailEl) emailEl.textContent = userEmail;
 
     await loadPage(0);
 
     document.getElementById('btn-dashboard-logout')?.addEventListener('click', async () => {
-        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include'});
+        await fetch('/api/auth/logout', {method: 'POST', credentials: 'include'});
         window.location.reload();
     });
 }
@@ -27,8 +29,8 @@ export async function show(user) {
 // Data loading
 
 async function loadPage(page) {
-    const listEl  = document.getElementById('dashboard-list');
-    const pageEl  = document.getElementById('dashboard-pagination');
+    const listEl = document.getElementById('dashboard-list');
+    const pageEl = document.getElementById('dashboard-pagination');
     if (!listEl) return;
 
     listEl.innerHTML = '<div class="loading-state">Loading…</div>';
@@ -36,12 +38,15 @@ async function loadPage(page) {
 
     const pageSize = 20;
     try {
-        const res = await fetch(`/api/users/me/clipboards?page=${page}&size=${pageSize}`, { credentials: 'include' });
-        if (!res.ok) { listEl.innerHTML = '<div class="loading-state">Failed to load clipboards.</div>'; return; }
+        const res = await fetch(`/api/users/me/clipboards?page=${page}&size=${pageSize}`, {credentials: 'include'});
+        if (!res.ok) {
+            listEl.innerHTML = '<div class="loading-state">Failed to load clipboards.</div>';
+            return;
+        }
 
         const data = await res.json();
         currentPage = page;
-        totalPages  = data.totalPages;
+        totalPages = data.totalPages;
 
         renderList(listEl, data.items);
         if (totalPages > 1 && pageEl) {
@@ -101,7 +106,7 @@ function clipboardCard(item) {
 
 function renderPagination(container, total, current, totalElements, size) {
     const start = current * size + 1;
-    const end   = Math.min((current + 1) * size, totalElements);
+    const end = Math.min((current + 1) * size, totalElements);
 
     let html = `<span class="pagination-info">${start}–${end} of ${totalElements}</span>`;
     html += `<button ${current === 0 ? 'disabled' : ''} data-pg="${current - 1}">&larr; Prev</button>`;
@@ -122,29 +127,42 @@ function renderPagination(container, total, current, totalElements, size) {
 
 // Actions
 
-async function handleDelete(code) {
-    if (!confirm(`Delete clipboard ${code}? This cannot be undone.`)) return;
 
-    try {
-        const res = await fetch(`/api/clipboards/${encodeURIComponent(code)}`, { method: 'DELETE', credentials: 'include' });
-        if (!res.ok && res.status !== 204) throw new Error('Delete failed');
-        // Remove card immediately, then reload current page
-        document.querySelector(`[data-code="${esc(code)}"]`)?.remove();
-        await loadPage(currentPage);
-    } catch (err) {
-        alert('Could not delete clipboard: ' + err.message);
-    }
+async function handleDelete(code) {
+    showDeleteModal(async () => {
+        try {
+            const res = await fetch(
+                `/api/clipboards/${encodeURIComponent(code)}`,
+                {
+                    method: "DELETE",
+                    credentials: "include"
+                }
+            );
+
+            if (!res.ok && res.status !== 204) {
+                throw new Error("Delete failed");
+            }
+
+            document.querySelector(`[data-code="${esc(code)}"]`)?.remove();
+            await loadPage(currentPage);
+
+        } catch (err) {
+
+            console.error(err);
+        }
+    });
 }
+
 
 // Helpers
 
 function formatDate(isoString) {
     if (!isoString) return '—';
     const d = new Date(isoString);
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
 }
 
 function esc(str) {
     return String(str ?? '').replace(/[&<>"']/g, c =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+        ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]);
 }

@@ -2,8 +2,8 @@
  * UI manipulation helpers.
  */
 
-import { getState } from './state.js';
-import { decryptString, decryptChunkBinary, base64ToBytes } from './crypto.js';
+import {getState} from './state.js';
+import {decryptString, decryptChunkBinary, base64ToBytes} from './crypto.js';
 
 // --- Page navigation ---
 
@@ -55,8 +55,8 @@ export function setTextVersion(version) {
 
 export function setTextSize(bytes) {
     const size = bytes < 1024 ? `${bytes} B` :
-                 bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` :
-                 `${(bytes / 1048576).toFixed(1)} MB`;
+        bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` :
+            `${(bytes / 1048576).toFixed(1)} MB`;
     document.getElementById('text-size').textContent = size;
 }
 
@@ -67,14 +67,18 @@ export function showError(elementId, message) {
     if (!el) return;
     el.textContent = message;
     el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 8000);
+    setTimeout(() => {
+        el.style.display = 'none';
+    }, 8000);
 }
 
 export function showInfo(message) {
     const el = document.getElementById('clipboard-info');
     el.textContent = message;
     el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 5000);
+    setTimeout(() => {
+        el.style.display = 'none';
+    }, 5000);
 }
 
 export function hideError(elementId) {
@@ -131,14 +135,36 @@ export function hideQrModal() {
 }
 
 // --- Delete confirmation modal ---
+let confirmDeleteCallback = null;
 
-export function showDeleteModal() {
+export function showDeleteModal(callback) {
+    confirmDeleteCallback = callback;
     document.getElementById('confirm-delete-modal').style.display = 'flex';
 }
 
 export function hideDeleteModal() {
-    document.getElementById('confirm-delete-modal').style.display = 'none';
+    document.getElementById("confirm-delete-modal").style.display = "none";
 }
+
+document.getElementById("btn-confirm-delete")?.addEventListener("click", () => {
+    hideDeleteModal();
+
+    if (confirmDeleteCallback) {
+        confirmDeleteCallback();
+        confirmDeleteCallback = null;
+    }
+});
+
+document.getElementById("btn-cancel-delete")?.addEventListener("click", () => {
+    hideDeleteModal();
+    confirmDeleteCallback = null;
+});
+
+document.getElementById("btn-close-delete")?.addEventListener("click", () => {
+    hideDeleteModal();
+    confirmDeleteCallback = null;
+});
+
 
 // --- Text area ---
 
@@ -150,8 +176,9 @@ export function setTextContent(text) {
     document.getElementById('clipboard-text').value = text;
     setTextSize(new TextEncoder().encode(text).length);
 }
-export function  clear(){
-    let elCLear= document.getElementById('clipboard-text');
+
+export function clear() {
+    let elCLear = document.getElementById('clipboard-text');
     elCLear.value = "";
 }
 
@@ -230,7 +257,8 @@ export async function renderFileList(files) {
             if (state.cryptoKey && file.encryptedName) {
                 fileName = await decryptString(state.cryptoKey, file.encryptedName, file.encryptedNameIv);
             }
-        } catch { /* use fileCode as fallback */ }
+        } catch { /* use fileCode as fallback */
+        }
 
         const isOwn = file.sourceDeviceId === state.deviceId;
         const sizeStr = formatBytes(file.sizeBytes);
@@ -264,7 +292,7 @@ export async function renderFileList(files) {
             void (async () => {
                 try {
                     const plain = await decryptChunkBinary(state.cryptoKey, base64ToBytes(file.encryptedPreview), base64ToBytes(file.encryptedPreviewIv));
-                    const blob = new Blob([plain], { type: 'image/jpeg' });
+                    const blob = new Blob([plain], {type: 'image/jpeg'});
                     const url = URL.createObjectURL(blob);
                     const imgEl = el.querySelector('.file-thumb');
                     if (imgEl && document.contains(el)) {
@@ -273,7 +301,8 @@ export async function renderFileList(files) {
                     } else {
                         URL.revokeObjectURL(url);
                     }
-                } catch { /* ignore decryption errors */ }
+                } catch { /* ignore decryption errors */
+                }
             })();
         }
     }
