@@ -44,9 +44,6 @@ function parseRoute(path) {
 function handleRoute() {
     const route = parseRoute(location.pathname);
 
-
-
-
     // Hide all pages
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
 
