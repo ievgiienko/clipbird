@@ -133,6 +133,13 @@ body {
     background: var(--surface-hover);
 }
 
+button.nav-link {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+}
+
 /* Site Main  */
 
 .privacy-content, .terms-content, .refund-content {
@@ -680,14 +687,9 @@ textarea {
     background: var(--danger-hover);
 }
 
-
 .btn-large {
     padding: 0.85rem 2rem;
     font-size: 1.05rem;
-}
-
-.btn-full {
-    width: 100%;
 }
 
 .link-btn {
@@ -703,6 +705,10 @@ textarea {
 
 .link-btn:hover {
     color: var(--primary-hover);
+}
+
+.btn-full {
+    width: 100%;
 }
 
 /* --- Clipboard header --- */
