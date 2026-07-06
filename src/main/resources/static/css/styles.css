@@ -133,21 +133,6 @@ body {
     background: var(--surface-hover);
 }
 
-.link-btn {
-    background: none;
-    border: none;
-    color: var(--primary);
-    cursor: pointer;
-    font-size: inherit;
-    font-family: inherit;
-    text-decoration: underline;
-    padding: 0;
-}
-
-.link-btn:hover {
-    color: var(--primary-hover);
-}
-
 button.nav-link {
     background: none;
     border: none;
@@ -702,10 +687,24 @@ textarea {
     background: var(--danger-hover);
 }
 
-
 .btn-large {
     padding: 0.85rem 2rem;
     font-size: 1.05rem;
+}
+
+.link-btn {
+    background: none;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+    text-decoration: underline;
+    padding: 0;
+}
+
+.link-btn:hover {
+    color: var(--primary-hover);
 }
 
 .btn-full {
