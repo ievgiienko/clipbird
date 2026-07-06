@@ -133,6 +133,28 @@ body {
     background: var(--surface-hover);
 }
 
+.link-btn {
+    background: none;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+    text-decoration: underline;
+    padding: 0;
+}
+
+.link-btn:hover {
+    color: var(--primary-hover);
+}
+
+button.nav-link {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+}
+
 /* Site Main  */
 
 .privacy-content, .terms-content, .refund-content {
@@ -689,27 +711,6 @@ textarea {
 .btn-full {
     width: 100%;
 }
-
-
-
-
-
-#btn-nav-logout {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font: inherit;
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-#btn-nav-logout:hover{
-    color: var(--text);
-    background: var(--surface-hover);
-}
-
-
-
 
 /* --- Clipboard header --- */
 
