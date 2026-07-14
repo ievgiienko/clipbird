@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.util.List;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.*;
 @SpringBootTest
 @Import(TestRedisConfig.class)
 @ActiveProfiles("test")
+@Transactional
 class TransferServiceTest {
 
     @Autowired
