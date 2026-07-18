@@ -185,6 +185,88 @@ class CleanupServiceTest {
             appProps.getCleanup().setHardDeleteEnabled(original);
         }
     }
+    // Verifies that purge skips deleted clipboards whose retention period has not yet expired.
+    @Test
+    void purgeShouldIgnoreDeletedClipboardInsideRetentionPeriod() {
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
+        String code = created.clipboardCode();
+        clipboardService.setPasswordHash(code, "hash");
+        clipboardService.deleteClipboard(code, null);
+
+        Clipboard clipboard = clipboardRepository.findByClipboardCode(code).orElseThrow();
+
+        int delay = appProps.getCleanup().getHardDeleteDelayHours();
+
+        // Still inside retention period
+        clipboard.setExpiresAt(Instant.now().minus(delay - 1, ChronoUnit.HOURS));
+        clipboardRepository.saveAndFlush(clipboard);
+
+        cleanupService.purgeDeletedClipboards();
+
+        assertTrue(
+                clipboardRepository.findByClipboardCode(code).isPresent(),
+                "Clipboard should remain because retention period has not expired yet"
+        );
+    }
+
+    // Verifies that purge only removes clipboards marked as DELETED or EXPIRED.
+    @Test
+    void purgeShouldNotRemoveClipboardWithoutDeletedOrExpiredStatus() {
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
+        String code = created.clipboardCode();
+        clipboardService.setPasswordHash(code, "hash");
+
+        Clipboard clipboard = clipboardRepository.findByClipboardCode(code).orElseThrow();
+        int delay = appProps.getCleanup().getHardDeleteDelayHours();
+
+        // Even though expiresAt is far in the past, the status is still ACTIVE.
+        clipboard.setExpiresAt(Instant.now().minus(delay + 24, ChronoUnit.HOURS));
+        clipboardRepository.saveAndFlush(clipboard);
+
+        cleanupService.purgeDeletedClipboards();
+
+        Clipboard remaining = clipboardRepository.findByClipboardCode(code).orElse(null);
+
+        assertNotNull(remaining);
+        assertEquals(ClipboardStatus.ACTIVE, remaining.getStatus());
+    }
+
+    // Verifies that purge completes successfully when there are no eligible clipboards to delete.
+    @Test
+    void purgeShouldNotFailWhenDatabaseContainsNoEligibleClipboards() {
+        assertDoesNotThrow(() -> cleanupService.purgeDeletedClipboards());
+    }
+
+    // Verifies that purge removes only eligible clipboards and leaves active ones untouched.
+    @Test
+    void purgeShouldDeleteOnlyEligibleClipboard() {
+        // Clipboard that should be deleted
+        ClipboardCreatedResponse deletedCreated = clipboardService.createClipboard(null, null);
+        clipboardService.setPasswordHash(deletedCreated.clipboardCode(), "hash");
+        clipboardService.deleteClipboard(deletedCreated.clipboardCode(), null);
+
+        Clipboard deleted = clipboardRepository
+                .findByClipboardCode(deletedCreated.clipboardCode())
+                .orElseThrow();
+
+        int delay = appProps.getCleanup().getHardDeleteDelayHours();
+        deleted.setExpiresAt(Instant.now().minus(delay + 1, ChronoUnit.HOURS));
+        clipboardRepository.saveAndFlush(deleted);
+
+        // Clipboard that should remain
+        ClipboardCreatedResponse activeCreated = clipboardService.createClipboard(null, null);
+        clipboardService.setPasswordHash(activeCreated.clipboardCode(), "hash");
+
+        cleanupService.purgeDeletedClipboards();
+
+        assertFalse(
+                clipboardRepository.existsByClipboardCode(deletedCreated.clipboardCode())
+        );
+
+        assertTrue(
+                clipboardRepository.existsByClipboardCode(activeCreated.clipboardCode())
+        );
+    }
 
     @Test
     void purgeRemovesRemainingChildRecords() {
