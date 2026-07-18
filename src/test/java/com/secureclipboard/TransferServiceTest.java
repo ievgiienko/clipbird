@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.WebSocketSession;
+import com.secureclipboard.service.RedisChunkStore;
 
 import java.util.List;
 import java.util.UUID;
@@ -48,6 +49,10 @@ class TransferServiceTest {
 
     @Autowired
     private DeviceSessionManager sessionManager;
+
+    @Autowired
+    private RedisChunkStore chunkStore;
+
 
     private String clipboardCode;
     private String fileCode;
@@ -294,6 +299,212 @@ class TransferServiceTest {
 
         TransferResponse afterCheck = transferService.getTransfer(transfer.transferCode());
         assertEquals("COMPLETED", afterCheck.status());
+    }
+    @Test
+    void shouldRejectTransferForRemovedFile() {
+        ClipboardFile file = fileRepository.findByFileCode(fileCode).orElseThrow();
+        file.setStatus(FileStatus.REMOVED);
+        fileRepository.save(file);
+        assertThrows(IllegalArgumentException.class, () ->
+                transferService.createTransfer(
+                        new CreateTransferRequest(clipboardCode, fileCode, "target-device")));
+    }
+
+    // Downloading a chunk from a cancelled transfer should not be allowed.
+    @Test
+    void shouldRejectDownloadAfterTransferCancelled() {
+        TransferResponse transfer = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+        transferService.uploadChunk(
+                transfer.transferCode(),
+                0,
+                new byte[]{1, 2, 3},
+                "iv-0",
+                "hash-0"
+        );
+        transferService.cancelTransfer(transfer.transferCode());
+        assertThrows(
+                IllegalStateException.class,
+                () -> transferService.downloadChunk(transfer.transferCode(), 0)
+        );
+    }
+
+    // Cancelling an already cancelled transfer should keep it in the cancelled state.
+    @Test
+    void shouldAllowRepeatedTransferCancellation() {
+        TransferResponse transfer = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+
+        transferService.cancelTransfer(transfer.transferCode());
+
+        assertDoesNotThrow(() ->
+                transferService.cancelTransfer(transfer.transferCode()));
+
+        TransferResponse response = transferService.getTransfer(transfer.transferCode());
+
+        assertEquals("CANCELLED", response.status());
+    }
+
+    // Uploading a chunk after a transfer has been cancelled should not be allowed.
+    @Test
+    void shouldRejectAcknowledgementAfterTransferCancelled() {
+        TransferResponse transfer = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+        transferService.cancelTransfer(transfer.transferCode());
+        assertThrows(
+                IllegalStateException.class,
+                () -> transferService.uploadChunk(
+                        transfer.transferCode(),
+                        0,
+                        new byte[]{1},
+                        "iv",
+                        "hash"));
+    }
+
+    // Loading a transfer should return the same metadata that was created
+    @Test
+    void shouldReturnSameTransferInformation() {
+        TransferResponse created = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+
+        TransferResponse loaded = transferService.getTransfer(created.transferCode());
+
+        assertEquals(created.transferCode(), loaded.transferCode());
+        assertEquals(created.fileCode(), loaded.fileCode());
+        assertEquals(created.sourceDeviceId(), loaded.sourceDeviceId());
+        assertEquals(created.targetDeviceId(), loaded.targetDeviceId());
+        assertEquals(created.totalChunks(), loaded.totalChunks());
+        assertEquals(created.currentChunkNo(), loaded.currentChunkNo());
+        assertEquals(created.status(), loaded.status());
+    }
+
+    // Creating a transfer for a non-existing file should fail.
+    @Test
+    void shouldRejectCreatingTransferForMissingFile() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transferService.createTransfer(
+                        new CreateTransferRequest(
+                                clipboardCode,
+                                UUID.randomUUID().toString(),
+                                "target-device")));
+    }
+
+    // Requesting a non-existing transfer should throw an except
+    @Test
+    void shouldRejectUnknownTransferCode() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transferService.getTransfer(UUID.randomUUID().toString()));
+    }
+
+    // Uploading a chunk for a non-existing transfer should fail.
+    @Test
+    void shouldRejectUnknownTransferDuringUpload() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transferService.uploadChunk(
+                        UUID.randomUUID().toString(),
+                        0,
+                        new byte[]{1, 2, 3},
+                        "iv",
+                        "hash"));
+    }
+
+    // Downloading a chunk for a non-existing transfer should fail.
+    @Test
+    void shouldRejectUnknownTransferDuringDownload() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transferService.downloadChunk(
+                        UUID.randomUUID().toString(),
+                        0));
+    }
+
+    // A transfer should remain awaiting the next chunk until all chunks are acknowledged.
+    @Test
+    void shouldKeepTransferStatusAsAwaitingChunkAfterFirstAcknowledgement() {
+        TransferResponse transfer = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+
+        transferService.uploadChunk(
+                transfer.transferCode(),
+                0,
+                new byte[]{1},
+                "iv-0",
+                "hash-0");
+
+        transferService.acknowledgeChunk(transfer.transferCode());
+
+        TransferResponse updated = transferService.getTransfer(transfer.transferCode());
+
+        assertEquals("AWAITING_CHUNK", updated.status());
+        assertEquals(1, updated.currentChunkNo());
+    }
+
+    // Downloaded chunk should contain the same hash that was uploaded.
+    @Test
+    void shouldReturnChunkHashWhenDownloading() {
+        TransferResponse transfer = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+
+        transferService.uploadChunk(
+                transfer.transferCode(),
+                0,
+                new byte[]{5, 6, 7},
+                "iv-test",
+                "expected-hash");
+
+        ChunkDownloadResponse response =
+                transferService.downloadChunk(transfer.transferCode(), 0);
+
+        assertEquals("expected-hash", response.chunkHash());
+    }
+
+    // Retrieving a transfer should return its current persisted state.
+    @Test
+    void shouldReturnCurrentTransferState() {
+        TransferResponse created = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+
+        TransferResponse loaded =
+                transferService.getTransfer(created.transferCode());
+
+        assertEquals(created.transferCode(), loaded.transferCode());
+        assertEquals(fileCode, loaded.fileCode());
+        assertEquals("source-device", loaded.sourceDeviceId());
+        assertEquals("target-device", loaded.targetDeviceId());
+        assertEquals("AWAITING_CHUNK", loaded.status());
+        assertEquals(0, loaded.currentChunkNo());
+        assertEquals(3, loaded.totalChunks());
+    }
+
+    // Upload should be rejected after the transfer has been cancelled
+    @Test
+    void shouldRejectUploadAfterTransferCancelled() {
+        TransferResponse transfer = transferService.createTransfer(
+                new CreateTransferRequest(clipboardCode, fileCode, "target-device"));
+
+        transferService.cancelTransfer(transfer.transferCode());
+
+        IllegalStateException ex = assertThrows(
+                IllegalStateException.class,
+                () -> transferService.uploadChunk(
+                        transfer.transferCode(),
+                        0,
+                        new byte[]{1},
+                        "iv",
+                        "hash"
+                )
+        );
+
+        assertTrue(ex.getMessage().contains("Transfer is no longer active"));
+        assertEquals(
+                TransferStatus.CANCELLED,
+                transferRepository.findByTransferCode(transfer.transferCode())
+                        .orElseThrow()
+                        .getStatus()
+        );
     }
 
     @Test
