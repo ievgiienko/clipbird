@@ -142,6 +142,48 @@ class ClipboardControllerTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.expiresAt").isNotEmpty());
     }
+    // Verifies that a newly created clipboard returns an empty state.
+    @Test
+    void shouldReturnClipboardStateImmediatelyAfterCreation() throws Exception {
+        MvcResult createResult = mockMvc.perform(post("/api/clipboards")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode created = objectMapper.readTree(createResult.getResponse().getContentAsString());
+        String code = created.get("clipboardCode").asText();
+
+        mockMvc.perform(get("/api/clipboards/" + code + "/state"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clipboardCode").value(code))
+                .andExpect(jsonPath("$.text").doesNotExist())
+                .andExpect(jsonPath("$.files").isArray())
+                .andExpect(jsonPath("$.files").isEmpty())
+                .andExpect(jsonPath("$.connectedDevices").value(0));
+    }
+
+    // Verifies that password verification fails for a non-existent clipboard.
+    @Test
+    void shouldRejectPasswordVerificationForUnknownClipboard() throws Exception {
+        mockMvc.perform(post("/api/clipboards/UNKNOWN123/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"passwordHash\":\"hash\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // Verifies that deleting a non-existent clipboard returns not found.
+    @Test
+    void shouldReturnNotFoundWhenDeletingUnknownClipboard() throws Exception {
+        mockMvc.perform(delete("/api/clipboards/UNKNOWN123"))
+                .andExpect(status().isNotFound());
+    }
+
+    // Verifies that requesting the state of a non-existent clipboard returns bad request.
+    @Test
+    void shouldReturnBadRequestWhenGettingUnknownClipboardState() throws Exception {
+        mockMvc.perform(get("/api/clipboards/UNKNOWN123/state"))
+                .andExpect(status().isBadRequest());
+    }
 
     @Test
     void shouldRejectInvalidTtl() throws Exception {
