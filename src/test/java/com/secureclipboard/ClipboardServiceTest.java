@@ -179,7 +179,75 @@ class ClipboardServiceTest {
 
         assertNull(manifest.fileHash());
     }
+    // Verifies that removing a file updates the clipboard state correctly.
+    @Test
+    void shouldRemoveFileFromClipboardState() {
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
+        String code = created.clipboardCode();
+        clipboardService.setPasswordHash(code, "hash");
 
+        WebSocketSession mockSession = mock(WebSocketSession.class);
+        when(mockSession.getId()).thenReturn("sess-" + UUID.randomUUID());
+        when(mockSession.isOpen()).thenReturn(true);
+        sessionManager.join(code, "source-dev", mockSession);
+
+        FileManifestDto file = clipboardService.addFile(code, new AddFileRequest(
+                "enc-name",
+                "enc-iv",
+                "",
+                "",
+                1000,
+                1,
+                "source-dev",
+                null,
+                null,
+                null
+        ));
+
+        ClipboardStateResponse before = clipboardService.getState(code);
+        assertEquals(1, before.files().size());
+
+        clipboardService.removeFile(code, file.fileCode());
+
+        ClipboardStateResponse after = clipboardService.getState(code);
+        assertTrue(after.files().isEmpty());
+    }
+
+    // Verifies that password verification is not allowed after the clipboard has been deleted.
+    @Test
+    void shouldRejectVerificationForDeletedClipboard() {
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
+        String code = created.clipboardCode();
+
+        clipboardService.setPasswordHash(code, "hash");
+        clipboardService.deleteClipboard(code, null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> clipboardService.verifyPassword(code, "hash"));
+    }
+
+    // Verifies that a newly created clipboard has no text, files, or connected devices.
+    @Test
+    void shouldReturnEmptyStateForNewClipboard() {
+        ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
+        String code = created.clipboardCode();
+
+        ClipboardStateResponse state = clipboardService.getState(code);
+
+        assertEquals(code, state.clipboardCode());
+        assertNull(state.text());
+        assertTrue(state.files().isEmpty());
+        assertEquals(0, state.connectedDevices());
+    }
+
+    // Verifies that each created clipboard receives a unique clipboard code.
+    @Test
+    void shouldGenerateUniqueClipboardCodes() {
+        ClipboardCreatedResponse first = clipboardService.createClipboard(null, null);
+        ClipboardCreatedResponse second = clipboardService.createClipboard(null, null);
+
+        assertNotEquals(first.clipboardCode(), second.clipboardCode());
+    }
     @Test
     void shouldStoreAndReturnEncryptedPreview() {
         ClipboardCreatedResponse created = clipboardService.createClipboard(null, null);
