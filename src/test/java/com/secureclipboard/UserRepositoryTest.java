@@ -63,7 +63,44 @@ class UserRepositoryTest {
         assertThrows(DataIntegrityViolationException.class,
             () -> userRepository.saveAndFlush(duplicate));
     }
+    // Verifies that each saved user receives a unique identifier.
+    @Test
+    void shouldAssignDifferentIdsToDifferentUsers() {
+        User first = userRepository.save(buildUser("user1@example.com"));
+        User second = userRepository.save(buildUser("user2@example.com"));
 
+        assertNotEquals(first.getId(), second.getId());
+    }
+
+    // Verifies that the stored email is returned without modification.
+    @Test
+    void shouldPreserveEmailExactlyAsSaved() {
+        User saved = userRepository.save(buildUser("CaseSensitive@example.com"));
+
+        User found = userRepository.findByEmail("CaseSensitive@example.com").orElseThrow();
+
+        assertEquals("CaseSensitive@example.com", found.getEmail());
+    }
+
+    // Verifies that a newly saved user is immediately available for repository queries.
+    @Test
+    void shouldFindRecentlySavedUser() {
+        String email = "recent@example.com";
+
+        userRepository.save(buildUser(email));
+
+        assertTrue(userRepository.findByEmail(email).isPresent());
+        assertTrue(userRepository.existsByEmail(email));
+    }
+
+    // Verifies that the repository assigns a valid creation timestamp to new users.
+    @Test
+    void shouldStoreCreationTimestamp() {
+        User saved = userRepository.save(buildUser("timestamp@example.com"));
+
+        assertNotNull(saved.getCreatedAt());
+        assertFalse(saved.getCreatedAt().isAfter(java.time.Instant.now()));
+    }
     @Test
     void shouldPersistPasswordHash() {
         User user = buildUser("dave@example.com");
