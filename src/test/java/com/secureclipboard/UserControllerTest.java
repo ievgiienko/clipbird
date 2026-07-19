@@ -214,6 +214,126 @@ class UserControllerTest {
             .andExpect(jsonPath("$.totalElements").value(1))
             .andExpect(jsonPath("$.items[0].clipboardCode").value(code));
     }
+    // Verifies that requesting a page beyond the available data returns an empty result.
+    @Test
+    void shouldReturnEmptySecondPage() throws Exception {
+        String email = uniqueEmail();
+        MockHttpSession session = loginSession(email, "password123");
+        User user = userRepository.findByEmail(email).orElseThrow();
+
+        createClipboard(user, ClipboardStatus.ACTIVE);
+
+        mockMvc.perform(get("/api/users/me/clipboards?page=1&size=10").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    // Verifies that expired clipboards remain visible in the user's list.
+    @Test
+    void shouldReturnOnlyExpiredClipboardWhenItIsTheOnlyOne() throws Exception {
+        String email = uniqueEmail();
+        MockHttpSession session = loginSession(email, "password123");
+        User user = userRepository.findByEmail(email).orElseThrow();
+
+        createClipboard(user, ClipboardStatus.EXPIRED);
+
+        mockMvc.perform(get("/api/users/me/clipboards").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].status").value("EXPIRED"));
+    }
+
+    // Verifies that the owner can delete their own clipboard.
+    @Test
+    void shouldAllowOwnerToDeleteOwnClipboard() throws Exception {
+        String email = uniqueEmail();
+        MockHttpSession session = loginSession(email, "password123");
+        User user = userRepository.findByEmail(email).orElseThrow();
+
+        Clipboard clipboard = createClipboard(user, ClipboardStatus.ACTIVE);
+
+        mockMvc.perform(delete("/api/clipboards/" + clipboard.getClipboardCode())
+                        .session(session))
+                .andExpect(status().isNoContent());
+    }
+
+    // Verifies that the returned clipboard code matches the stored clipboard.
+    @Test
+    void shouldReturnCorrectClipboardCodeInList() throws Exception {
+        String email = uniqueEmail();
+        MockHttpSession session = loginSession(email, "password123");
+        User user = userRepository.findByEmail(email).orElseThrow();
+
+        Clipboard clipboard = createClipboard(user, ClipboardStatus.ACTIVE);
+
+        mockMvc.perform(get("/api/users/me/clipboards").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].clipboardCode").value(clipboard.getClipboardCode()));
+    }
+
+    // Verifies that pagination metadata is correct for a single clipboard.
+    @Test
+    void shouldReturnCorrectPaginationMetadataForSingleClipboard() throws Exception {
+        String email = uniqueEmail();
+        MockHttpSession session = loginSession(email, "password123");
+        User user = userRepository.findByEmail(email).orElseThrow();
+
+        createClipboard(user, ClipboardStatus.ACTIVE);
+
+        mockMvc.perform(get("/api/users/me/clipboards?page=0&size=10").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
+    }
+
+    // Verifies that deleted clipboards are excluded from the user list.
+    @Test
+    void shouldReturnEmptyResultForUserWithoutActiveClipboards() throws Exception {
+        String email = uniqueEmail();
+        MockHttpSession session = loginSession(email, "password123");
+        User user = userRepository.findByEmail(email).orElseThrow();
+
+        createClipboard(user, ClipboardStatus.DELETED);
+
+        mockMvc.perform(get("/api/users/me/clipboards").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    // Verifies that the clipboard status is returned correctly.
+    @Test
+    void shouldReturnClipboardStatusForActiveClipboard() throws Exception {
+        String email = uniqueEmail();
+        MockHttpSession session = loginSession(email, "password123");
+        User user = userRepository.findByEmail(email).orElseThrow();
+
+        createClipboard(user, ClipboardStatus.ACTIVE);
+
+        mockMvc.perform(get("/api/users/me/clipboards").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].status").value("ACTIVE"));
+    }
+
+    // Verifies that repeated requests return consistent clipboard data.
+    @Test
+    void shouldNotChangeClipboardListAfterRepeatedRequests() throws Exception {
+        String email = uniqueEmail();
+        MockHttpSession session = loginSession(email, "password123");
+        User user = userRepository.findByEmail(email).orElseThrow();
+
+        createClipboard(user, ClipboardStatus.ACTIVE);
+        createClipboard(user, ClipboardStatus.ACTIVE);
+
+        mockMvc.perform(get("/api/users/me/clipboards").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2));
+
+        mockMvc.perform(get("/api/users/me/clipboards").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }
 
     @Test
     void guestCanStillCreateClipboardWhileUserIsLoggedIn() throws Exception {
