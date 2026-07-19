@@ -140,7 +140,95 @@ class TransferControllerTest {
         byte[] downloadedData = downloadResult.getResponse().getContentAsByteArray();
         assertArrayEquals(chunkData, downloadedData);
     }
+    // Verifies that the controller returns transfer information for an existing transfer.
+    @Test
+    void shouldReturnTransferInfoByTransferCode() throws Exception {
+        String body = objectMapper.writeValueAsString(
+                new java.util.HashMap<>() {{
+                    put("clipboardCode", clipboardCode);
+                    put("fileCode", fileCode);
+                    put("targetDeviceId", "target-dev");
+                }});
 
+        MvcResult createResult = mockMvc.perform(post("/api/transfers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode createdTransfer =
+                objectMapper.readTree(createResult.getResponse().getContentAsString());
+
+        String transferCode = createdTransfer.get("transferCode").asText();
+
+        mockMvc.perform(get("/api/transfers/{tc}", transferCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transferCode").value(transferCode))
+                .andExpect(jsonPath("$.fileCode").value(fileCode))
+                .andExpect(jsonPath("$.sourceDeviceId").value("source-dev"))
+                .andExpect(jsonPath("$.targetDeviceId").value("target-dev"));
+    }
+
+    // Verifies that the controller cancels a transfer and exposes its cancelled state.
+    @Test
+    void shouldCancelTransferViaController() throws Exception {
+        String body = objectMapper.writeValueAsString(
+                new java.util.HashMap<>() {{
+                    put("clipboardCode", clipboardCode);
+                    put("fileCode", fileCode);
+                    put("targetDeviceId", "target-dev");
+                }});
+
+        MvcResult createResult = mockMvc.perform(post("/api/transfers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode createdTransfer =
+                objectMapper.readTree(createResult.getResponse().getContentAsString());
+
+        String transferCode = createdTransfer.get("transferCode").asText();
+
+        mockMvc.perform(delete("/api/transfers/{tc}", transferCode))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/transfers/{tc}", transferCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    // Verifies that the GET endpoint returns the current transfer state without modifying it.
+    @Test
+    void shouldReturnTransferStateByGetEndpoint() throws Exception {
+        String body = objectMapper.writeValueAsString(
+                new java.util.HashMap<>() {{
+                    put("clipboardCode", clipboardCode);
+                    put("fileCode", fileCode);
+                    put("targetDeviceId", "target-dev");
+                }});
+
+        MvcResult createResult = mockMvc.perform(post("/api/transfers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode createdTransfer =
+                objectMapper.readTree(createResult.getResponse().getContentAsString());
+
+        String transferCode = createdTransfer.get("transferCode").asText();
+
+        mockMvc.perform(get("/api/transfers/{tc}", transferCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transferCode").value(transferCode))
+                .andExpect(jsonPath("$.fileCode").value(fileCode))
+                .andExpect(jsonPath("$.sourceDeviceId").value("source-dev"))
+                .andExpect(jsonPath("$.targetDeviceId").value("target-dev"))
+                .andExpect(jsonPath("$.status").value("AWAITING_CHUNK"))
+                .andExpect(jsonPath("$.currentChunkNo").value(0))
+                .andExpect(jsonPath("$.totalChunks").value(2));
+    }
     @Test
     void shouldDownloadLastChunkWithCorrectHeader() throws Exception {
         // Create transfer for a file with 2 chunks
