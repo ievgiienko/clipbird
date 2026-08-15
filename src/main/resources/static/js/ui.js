@@ -143,10 +143,10 @@ export function showDeleteModal(callback) {
 }
 
 export function hideDeleteModal() {
-    document.getElementById("confirm-delete-modal").style.display = "none";
+    document.getElementById('confirm-delete-modal').style.display = 'none';
 }
 
-document.getElementById("btn-confirm-delete")?.addEventListener("click", () => {
+document.getElementById('btn-confirm-delete')?.addEventListener('click', () => {
     hideDeleteModal();
 
     if (confirmDeleteCallback) {
@@ -155,16 +155,15 @@ document.getElementById("btn-confirm-delete")?.addEventListener("click", () => {
     }
 });
 
-document.getElementById("btn-cancel-delete")?.addEventListener("click", () => {
+document.getElementById('btn-cancel-delete')?.addEventListener('click', () => {
     hideDeleteModal();
     confirmDeleteCallback = null;
 });
 
-document.getElementById("btn-close-delete")?.addEventListener("click", () => {
+document.getElementById('btn-close-delete')?.addEventListener('click', () => {
     hideDeleteModal();
     confirmDeleteCallback = null;
 });
-
 
 // --- Text area ---
 

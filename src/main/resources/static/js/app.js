@@ -12,17 +12,16 @@ import * as crypto from './crypto.js';
 import * as api from './api.js';
 import * as auth from './auth.js';
 import * as dashboard from './dashboard.js';
-import { ClipboardWebSocket } from './ws.js';
+import {ClipboardWebSocket} from './ws.js';
 import * as fileStore from './file-store.js';
-import { getState, setState, resetState, generateDeviceId } from './state.js';
+import {getState, setState, resetState, generateDeviceId} from './state.js';
 import * as ui from './ui.js';
 import * as router from './router.js';
-import { generateQR, toSvg } from './qr.js';
+import {generateQR, toSvg} from './qr.js';
 import * as passwordStrength from './password-strength.js';
-import { initTheme } from './theme.js';
-import { initPwa } from './pwa.js';
+import {initTheme} from './theme.js';
+import {initPwa} from './pwa.js';
 import * as fileWriter from './file-writer.js';
-
 
 
 console.log('APPLOADED');
@@ -40,11 +39,11 @@ let ws = null;
 // --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', () => {
-  
+
     initTheme();
     initPwa();
     fileWriter.cleanupOrphans();
-    setState({ deviceId: generateDeviceId() });
+    setState({deviceId: generateDeviceId()});
     bindEvents();
     passwordStrength.bind('create-password', 'password-strength');
     auth.initNav(router.navigate);
@@ -52,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
     auth.initRegisterPage(router.navigate);
     router.init(onRouteChange);
 });
-
 
 
 function getSelectedTtl() {
@@ -93,7 +91,6 @@ function bindEvents() {
     document.getElementById('btn-copy-link').addEventListener('click', handleCopyLink);
     document.getElementById('btn-show-qr').addEventListener('click', handleShowQr);
     document.getElementById('clipboard-text').addEventListener('input', handleTextInput);
-
 
 
     // File handling
@@ -161,7 +158,10 @@ function bindEvents() {
 
 function onEnterKey(inputId, handler) {
     document.getElementById(inputId).addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); handler(); }
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handler();
+        }
     });
 }
 
@@ -173,12 +173,12 @@ async function onRouteChange(route) {
 
     // Clean up WS and overlays if navigating away from clipboard
 
-    
+
     if (route.page !== 'clipboard') {
-      
-        if(ws){
+
+        if (ws) {
             ws.disconnect();
-            ws=null;
+            ws = null;
         }
         resetState();
         await fileStore.clearAll();
@@ -188,23 +188,20 @@ async function onRouteChange(route) {
 
     if (route.page === 'clipboard' && route.code) {
 
-     
+
         // Trusted-device flow: read password from URL fragment and strip it immediately.
         // The fragment is never sent to the server (RFC 3986).
         // replaceState removes it from the address bar and current history entry.
         const fragmentPassword = readAndStripFragment();
 
 
-        if ( state.clipboardCode === route.code && state.cryptoKey) {
+        if (state.clipboardCode === route.code && state.cryptoKey) {
             // Already authenticated for this clipboard
 
-         
+
             showViewPasswordButton();
 
-        }
-
-
-         else if (fragmentPassword) {
+        } else if (fragmentPassword) {
             // Auto-authenticate using password from QR fragment
             autoOpenFromFragment(route.code, fragmentPassword);
         } else {
@@ -243,7 +240,7 @@ async function onRouteChange(route) {
     }
 }
 
- 
+
 // --- Fragment handling (trusted-device flow) ---
 
 /**
@@ -304,10 +301,12 @@ function handleGeneratePassword() {
     const input = document.getElementById('create-password');
     input.value = password;
     input.type = 'text';
-    setTimeout(() => { input.type = 'password'; }, 3000);
+    setTimeout(() => {
+        input.type = 'password';
+    }, 3000);
 
     // Trigger strength indicator update
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('input', {bubbles: true}));
 
     // Clear confirm field so user must re-type
     document.getElementById('create-password-confirm').value = '';
@@ -438,7 +437,9 @@ function handleCopyPassword() {
     navigator.clipboard.writeText(state.generatedPassword).then(() => {
         const btn = document.getElementById('btn-modal-copy-password');
         btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+        setTimeout(() => {
+            btn.textContent = 'Copy';
+        }, 2000);
     });
 }
 
@@ -551,7 +552,7 @@ async function connectToClipboard(clipboardCode, passwordHash) {
     // Load current state
     try {
         const clipState = await api.getClipboardState(clipboardCode);
-        setState({ connectedDevices: clipState.connectedDevices });
+        setState({connectedDevices: clipState.connectedDevices});
         ui.setDeviceCount(clipState.connectedDevices);
 
         // Decrypt and display text
@@ -559,7 +560,7 @@ async function connectToClipboard(clipboardCode, passwordHash) {
             try {
                 const plaintext = await crypto.decryptText(state.cryptoKey, clipState.text.ciphertext, clipState.text.iv);
                 ui.setTextContent(plaintext);
-                setState({ textVersion: clipState.text.version });
+                setState({textVersion: clipState.text.version});
                 ui.setTextVersion(clipState.text.version);
             } catch {
                 ui.showError('clipboard-error', 'Failed to decrypt text. Wrong password?');
@@ -568,7 +569,7 @@ async function connectToClipboard(clipboardCode, passwordHash) {
 
         // Display files
         if (clipState.files && clipState.files.length > 0) {
-            setState({ files: clipState.files });
+            setState({files: clipState.files});
             await ui.renderFileList(clipState.files);
             updateDownloadAllButton();
         }
@@ -581,28 +582,28 @@ async function connectToClipboard(clipboardCode, passwordHash) {
 
 function setupWsHandlers(ws) {
     ws.on('connected', () => {
-        setState({ connected: true });
+        setState({connected: true});
         ui.setConnectionStatus(true);
     });
 
     ws.on('disconnected', () => {
-        setState({ connected: false });
+        setState({connected: false});
         ui.setConnectionStatus(false);
     });
 
     ws.on('joined', (msg) => {
-        setState({ connectedDevices: msg.connectedDevices });
+        setState({connectedDevices: msg.connectedDevices});
         ui.setDeviceCount(msg.connectedDevices);
     });
 
     ws.on('device_joined', (msg) => {
-        setState({ connectedDevices: msg.connectedDevices });
+        setState({connectedDevices: msg.connectedDevices});
         ui.setDeviceCount(msg.connectedDevices);
         refreshFileList();
     });
 
     ws.on('device_left', async (msg) => {
-        setState({ connectedDevices: msg.connectedDevices });
+        setState({connectedDevices: msg.connectedDevices});
         ui.setDeviceCount(msg.connectedDevices);
         refreshFileList();
 
@@ -622,16 +623,16 @@ function setupWsHandlers(ws) {
     ws.on('text_updated', async (msg) => {
         const state = getState();
         if (msg.updatedBy === state.deviceId) {
-            setState({ textVersion: msg.version });
+            setState({textVersion: msg.version});
             ui.setTextVersion(msg.version);
             return;
         }
         try {
             const plaintext = await crypto.decryptText(state.cryptoKey, msg.ciphertext, msg.iv);
-            setState({ textVersion: msg.version, isUpdatingText: true });
+            setState({textVersion: msg.version, isUpdatingText: true});
             ui.setTextContent(plaintext);
             ui.setTextVersion(msg.version);
-            setState({ isUpdatingText: false });
+            setState({isUpdatingText: false});
         } catch {
             ui.showError('clipboard-error', 'Failed to decrypt incoming text update');
         }
@@ -655,7 +656,10 @@ function setupWsHandlers(ws) {
         for (const [code, transfer] of state.activeTransfers) {
             if (transfer.fileCode === msg.fileCode && transfer.direction === 'download') {
                 if (transfer.writer) {
-                    try { await transfer.writer.cleanup(); } catch { /* ignore */ }
+                    try {
+                        await transfer.writer.cleanup();
+                    } catch { /* ignore */
+                    }
                 }
                 state.activeTransfers.delete(code);
                 onBatchTransferCompleted(code, false);
@@ -704,7 +708,7 @@ function handleTextInput() {
     setState({
         textUpdateTimer: setTimeout(() => sendTextUpdate(text), TEXT_DEBOUNCE_MS)
     });
-    
+
 }
 
 
@@ -745,7 +749,10 @@ async function generateThumbnail(file) {
                 else resolve(null);
             }, 'image/jpeg', 0.7);
         };
-        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve(null);
+        };
         img.src = url;
     });
 }
@@ -757,16 +764,14 @@ async function processFiles(files) {
     if (!state.cryptoKey) {
 
         console.error('NO CRYPTO KEY');
-    
+
         alert('Подожди секунду и попробуй снова');
-    
+
         return;
-    
-      }
-    
-     
-    
-        
+
+    }
+
+
     for (const file of files) {
         try {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
@@ -774,7 +779,7 @@ async function processFiles(files) {
             const encName = await crypto.encryptString(state.cryptoKey, file.name);
             const encMime = file.type
                 ? await crypto.encryptString(state.cryptoKey, file.type)
-                : { ciphertext: '', iv: '' };
+                : {ciphertext: '', iv: ''};
 
             let encryptedPreview = null;
             let encryptedPreviewIv = null;
@@ -805,7 +810,7 @@ async function processFiles(files) {
             await ui.renderFileList(state.files);
             updateDownloadAllButton();
 
-            ws.send({ type: 'file_added', file: manifest });
+            ws.send({type: 'file_added', file: manifest});
         } catch (err) {
             ui.showError('clipboard-error', 'Failed to add file: ' + err.message);
         }
@@ -876,7 +881,7 @@ function handleTransferAction(event) {
     if (!btn) return;
 
     if (btn.dataset.action === 'cancel-transfer') {
-        ws.send({ type: 'transfer_cancel', transferCode: btn.dataset.transferCode });
+        ws.send({type: 'transfer_cancel', transferCode: btn.dataset.transferCode});
     }
 }
 
@@ -888,7 +893,7 @@ async function removeFile(fileCode) {
         state.files = state.files.filter(f => f.fileCode !== fileCode);
         await ui.renderFileList(state.files);
         updateDownloadAllButton();
-        ws.send({ type: 'file_removed', fileCode });
+        ws.send({type: 'file_removed', fileCode});
     } catch (err) {
         ui.showError('clipboard-error', 'Failed to remove file: ' + err.message);
     }
@@ -948,7 +953,8 @@ async function startDownload(fileCode) {
         let fileName = fileCode;
         try {
             fileName = await crypto.decryptString(state.cryptoKey, file.encryptedName, file.encryptedNameIv);
-        } catch { /* fallback */ }
+        } catch { /* fallback */
+        }
 
         // Create streaming file writer (OPFS or in-memory fallback)
         const writer = await fileWriter.createWriter(transfer.transferCode, file.sizeBytes);
@@ -1019,7 +1025,7 @@ const sourceTransfers = new Map();
  */
 async function handleSendChunkRequest(msg) {
     const state = getState();
-    const { transferCode, fileCode, chunkNo } = msg;
+    const {transferCode, fileCode, chunkNo} = msg;
 
     try {
         const file = state.files.find(f => f.fileCode === fileCode);
@@ -1027,7 +1033,7 @@ async function handleSendChunkRequest(msg) {
 
         // Initialize per-transfer hash tracking
         if (!sourceTransfers.has(transferCode)) {
-            sourceTransfers.set(transferCode, { chunkHashes: [], totalChunks });
+            sourceTransfers.set(transferCode, {chunkHashes: [], totalChunks});
         }
         const srcTransfer = sourceTransfers.get(transferCode);
 
@@ -1080,7 +1086,7 @@ async function handleSendChunkRequest(msg) {
  */
 async function handleChunkReady(msg) {
     const state = getState();
-    const { transferCode, chunkNo } = msg;
+    const {transferCode, chunkNo} = msg;
     const transfer = state.activeTransfers.get(transferCode);
     if (!transfer) return;
 
@@ -1151,15 +1157,25 @@ async function handleChunkReady(msg) {
         transfer.nextByteOffset = (transfer.nextByteOffset || 0) + decrypted.byteLength;
 
         // ACK this chunk. Server will request the next chunk from the source.
-        ws.send({ type: 'chunk_ack', transferCode, chunkNo, chunkSize: transfer.chunkSize, byteOffset: transfer.nextByteOffset });
+        ws.send({
+            type: 'chunk_ack',
+            transferCode,
+            chunkNo,
+            chunkSize: transfer.chunkSize,
+            byteOffset: transfer.nextByteOffset
+        });
     } catch (err) {
         console.error('Failed to download chunk:', err);
         // Auto-cancel the stuck transfer and clean up
         try {
-            ws.send({ type: 'transfer_cancel', transferCode });
-        } catch { /* ws may be closed */ }
+            ws.send({type: 'transfer_cancel', transferCode});
+        } catch { /* ws may be closed */
+        }
         if (transfer.writer) {
-            try { await transfer.writer.cleanup(); } catch { /* ignore */ }
+            try {
+                await transfer.writer.cleanup();
+            } catch { /* ignore */
+            }
         }
         state.activeTransfers.delete(transferCode);
         ui.renderTransfers(state.activeTransfers);
@@ -1323,7 +1339,7 @@ function cancelBatchDownload() {
 
     // Cancel current in-progress transfer if any
     if (batchDownload.currentTransferCode) {
-        ws.send({ type: 'transfer_cancel', transferCode: batchDownload.currentTransferCode });
+        ws.send({type: 'transfer_cancel', transferCode: batchDownload.currentTransferCode});
     }
 
     batchDownload.active = false;
@@ -1367,11 +1383,12 @@ async function refreshFileList() {
     if (!state.clipboardCode) return;
     try {
         const clipState = await api.getClipboardState(state.clipboardCode);
-        setState({ files: clipState.files });
+        setState({files: clipState.files});
         await ui.renderFileList(clipState.files);
         updateDownloadAllButton();
-    } catch { /* ignore refresh errors */ }
-    
+    } catch { /* ignore refresh errors */
+    }
+
 }
 
 // --- Copy link ---
@@ -1427,7 +1444,7 @@ function updateQrNote(trusted) {
 function handleDelete() {
     ui.hideDeleteModal();
     try {
-        ws.send({ type: 'delete_clipboard' });
+        ws.send({type: 'delete_clipboard'});
     } catch (err) {
         ui.showError('clipboard-error', 'Failed to delete clipboard: ' + err.message);
     }
@@ -1437,9 +1454,12 @@ function handleDelete() {
 
 function cleanupAndGoHome() {
     console.log("CLEANUP CALLED");
-    if (ws) { ws.disconnect(); ws = null; }
+    if (ws) {
+        ws.disconnect();
+        ws = null;
+    }
     resetState();
-    setState({ deviceId: generateDeviceId() });
+    setState({deviceId: generateDeviceId()});
     fileStore.clearAll();
     ui.setTextContent('');
     ui.setTextVersion(0);
@@ -1451,41 +1471,29 @@ function cleanupAndGoHome() {
 }
 
 
-
-
-
 document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('copy-btn');
-  
+
     if (!btn) return;
-  
+
     btn.addEventListener('click', async () => {
-      const textarea = document.getElementById('clipboard-text');
-      const text = textarea.value;
-  
-      try {
-        await navigator.clipboard.writeText(text);
-  
-        const originalText = btn.textContent;
-        btn.textContent = 'Copied!';
-        btn.disabled = true;
-  
-        setTimeout(() => {
-          btn.textContent = originalText;
-          btn.disabled = false;
-        }, 2000);
-  
-      } catch (err) {
-        console.error('Copy failed:', err);
-      }
+        const textarea = document.getElementById('clipboard-text');
+        const text = textarea.value;
+
+        try {
+            await navigator.clipboard.writeText(text);
+
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.disabled = true;
+
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }, 2000);
+
+        } catch (err) {
+            console.error('Copy failed:', err);
+        }
     });
-  });
-
-
-
-
-
-
-
-
-  
+});
