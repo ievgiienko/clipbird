@@ -36,7 +36,7 @@ async function isOpfsSupported() {
  * Create a writer for a transfer. Chooses OPFS or in-memory fallback.
  * @param {string} transferCode — unique ID for the transfer
  * @param {number} totalSize — expected total file size in bytes
- * @returns {Promise<FileWriter>}
+ * @returns {Promise<OpfsWriter|MemoryWriter>}
  */
 export async function createWriter(transferCode, totalSize) {
     if (await isOpfsSupported()) {
