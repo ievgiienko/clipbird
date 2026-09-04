@@ -42,7 +42,6 @@ class TextClipboardE2ETest {
 
     // Verifies that a new clipboard can be created through the UI and a valid clipboard code is displayed.
     @Test
-    @Order(1)
     @DisplayName("Create clipboard")
     void createClipboard() {
         BrowserContext context = browser.newContext();
@@ -64,7 +63,6 @@ class TextClipboardE2ETest {
 
     // Verifies that an existing clipboard can be opened through the UI using a valid code and password.
     @Test
-    @Order(2)
     @DisplayName("Open clipboard")
     void openClipboard() {
         BrowserContext sourceContext = browser.newContext();
@@ -76,18 +74,7 @@ class TextClipboardE2ETest {
 
             String code = ClipboardActions.createClipboard(source, baseUrl, PASSWORD);
 
-            target.navigate(baseUrl + "/open");
-            target.fill("#open-code", code);
-            target.fill("#open-password", PASSWORD);
-            target.click("#btn-open");
-
-            target.waitForTimeout(1000);
-
-            System.out.println("Current URL: " + target.url());
-            System.out.println("Body:");
-            System.out.println(target.locator("body").innerText());
-
-            target.waitForSelector("#clipboard-unlocked");
+            ClipboardActions.openClipboard(target, baseUrl, code, PASSWORD);
 
             assertTrue(target.isVisible("#clipboard-unlocked"));
             assertEquals(code, target.textContent("#clipboard-id").trim());
@@ -98,17 +85,18 @@ class TextClipboardE2ETest {
         }
     }
 
-    // Verifies that clipboard text can be updated through the UI and the entered value is displayed.
+    // Verifies that clipboard text is stored and comes back for a device that opens the
+    // clipboard afterwards, which loads it from the server instead of receiving a live update.
     @Test
-    @Order(3)
     @DisplayName("Update clipboard text")
     void updateClipboardText() {
         BrowserContext context = browser.newContext();
+        BrowserContext reopenedContext = browser.newContext();
 
         try {
             Page page = context.newPage();
 
-            ClipboardActions.createClipboard(page, baseUrl, PASSWORD);
+            String code = ClipboardActions.createClipboard(page, baseUrl, PASSWORD);
 
             String text = "Updated clipboard text";
 
@@ -121,14 +109,28 @@ class TextClipboardE2ETest {
 
             assertEquals(text, textArea.inputValue());
 
+            Page reopened = reopenedContext.newPage();
+            ClipboardActions.openClipboard(reopened, baseUrl, code, PASSWORD);
+
+            reopened.waitForFunction(
+                    "expected => document.getElementById('clipboard-text').value === expected",
+                    text,
+                    new Page.WaitForFunctionOptions().setTimeout(30_000)
+            );
+
+            assertEquals(
+                    text,
+                    reopened.locator("#clipboard-text").inputValue()
+            );
+
         } finally {
             context.close();
+            reopenedContext.close();
         }
     }
 
     // Verifies that text entered on one connected device is synchronized to another device in real time.
     @Test
-    @Order(4)
     @DisplayName("Synchronize text between devices")
     void synchronizeTextBetweenDevices() {
         BrowserContext sourceContext = browser.newContext();
@@ -169,7 +171,6 @@ class TextClipboardE2ETest {
 
     // Verifies that a clipboard can be permanently deleted through the UI after user confirmation.
     @Test
-    @Order(5)
     @DisplayName("Delete clipboard")
     void deleteClipboard() {
         BrowserContext context = browser.newContext();
