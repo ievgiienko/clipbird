@@ -44,7 +44,7 @@ export class ClipboardWebSocket {
             }
         };
 
-        this.ws.onclose = (event) => {
+        this.ws.onclose = () => {
             this._emit('disconnected');
             if (this.joinParams && this.reconnectAttempts < this.maxReconnectAttempts) {
                 this.reconnectAttempts++;
