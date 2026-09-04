@@ -39,7 +39,7 @@ public class UserController {
 
         Pageable pageable = PageRequest.of(
             Math.max(0, page),
-            Math.min(Math.max(1, size), 100),
+            Math.clamp(size, 1, 100),
             Sort.by("createdAt").descending()
         );
 
