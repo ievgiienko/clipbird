@@ -16,14 +16,14 @@ import java.util.List;
 
 /**
  * Manages chunk-based file transfers with a simple sequential model.
- *
+ * <p>
  * Transfer flow (one chunk at a time):
  *   1. Target requests a chunk from the source via WebSocket.
  *   2. Source encrypts and uploads the chunk to the server (stored in Redis).
  *   3. Target downloads the chunk and sends ACK.
  *   4. Server clears the Redis chunk and advances to the next chunk.
  *   5. Repeat until all chunks are transferred.
- *
+ * <p>
  * Temporary chunk data is stored in Redis (not MySQL).
  * Transfer metadata (status, progress) remains in MySQL.
  */

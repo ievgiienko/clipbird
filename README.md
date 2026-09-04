@@ -20,9 +20,11 @@ An end-to-end encrypted, real-time clipboard sharing system. Share text and file
 
 | Component | Technology |
 |-----------|-----------|
-| Backend | Java 25, Spring Boot 4.0 |
+| Backend | Java 25, Spring Boot 4.1 |
+| Build | Gradle (Kotlin DSL), wrapper included |
 | Frontend | Plain JavaScript, HTML, CSS |
 | Database | MySQL 8 |
+| Ephemeral state | Redis (device presence, chunk relay) |
 | Real-time | WebSocket (native Spring) |
 | Encryption | Web Crypto API (AES-GCM, PBKDF2) |
 | Migrations | Flyway |
@@ -47,8 +49,7 @@ docker compose up --build -d
 ## Local Development (without Docker)
 
 ### Prerequisites
-- Java 25+ (JDK)
-- Maven 3.9+
+- Java 25+ (JDK). Gradle itself is not needed, the wrapper is in the repository.
 - MySQL 8 running locally
 
 ### Setup
@@ -58,13 +59,27 @@ docker compose up --build -d
 mysql -u root -p -e "CREATE DATABASE secure_clipboard; CREATE USER 'clipboard_user'@'localhost' IDENTIFIED BY 'clipboard_pass'; GRANT ALL ON secure_clipboard.* TO 'clipboard_user'@'localhost';"
 
 # Build
-mvn clean package
+./gradlew bootJar
 
 # Run
-java -jar target/secure-clipboard-1.0.0.jar
+java -jar build/libs/secure-clipboard-1.0.0.jar
 ```
 
-The application starts at `http://localhost:8080`.
+The application starts at `http://localhost:8080`. The port comes from a single
+variable, `SERVER_PORT`, which the application, the container and its published
+port all read; set it in `.env` to change all three at once.
+
+## Tests
+
+```bash
+# Unit and integration tests, no browsers required
+./gradlew test
+
+# Browser tests: install the bundles first, once per machine and after a
+# Playwright version bump
+./scripts/setup-e2e.sh
+./gradlew e2eTest
+```
 
 ## Project Structure
 
@@ -87,10 +102,14 @@ secure-clipboard/
 │   ├── db/migration/    # Flyway SQL migrations
 │   └── application.yml  # Configuration
 ├── src/test/            # Tests
+├── scripts/             # setup-e2e.sh: browser bundles for the e2e tests
+├── .github/workflows/   # CI: unit and browser test jobs
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
-└── pom.xml
+├── build.gradle.kts
+├── settings.gradle.kts
+└── gradle/libs.versions.toml
 ```
 
 ## API Summary
@@ -155,10 +174,11 @@ All settings are configurable via environment variables. See `.env.example` for 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `CLIPBOARD_TTL_HOURS` | 24 | Clipboard expiration time |
-| `CHUNK_SIZE` | 5242880 | File chunk size in bytes (5 MB) |
+| `CHUNK_SIZE` | 1048576 | File chunk size in bytes (1 MB) |
 | `MAX_TEXT_SIZE` | 10485760 | Max text content size (10 MB) |
 | `MAX_FILE_SIZE` | 524288000 | Max file size (500 MB) |
 | `CLIPBOARD_ID_LENGTH` | 8 | Length of generated clipboard codes |
+| `SERVER_PORT` | 8080 | Port for the application, the container and its published port |
 
 ## License
 
