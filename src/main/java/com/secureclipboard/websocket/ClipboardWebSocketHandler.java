@@ -8,6 +8,7 @@ import com.secureclipboard.dto.TransferResponse;
 import com.secureclipboard.service.ClipboardService;
 import com.secureclipboard.service.DeviceSessionManager;
 import com.secureclipboard.service.TransferService;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ import java.util.Map;
 public class ClipboardWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ClipboardWebSocketHandler.class);
+    private static final int MAX_CANCEL_REASON_LENGTH = 200;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final DeviceSessionManager sessionManager;
@@ -45,7 +47,7 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+    protected void handleTextMessage(@NonNull WebSocketSession session, @NonNull TextMessage message) throws Exception {
         JsonNode payload;
         try {
             payload = objectMapper.readTree(message.getPayload());
@@ -77,7 +79,7 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+    public void afterConnectionClosed(@NonNull WebSocketSession session, @NonNull CloseStatus status) {
         String deviceId = sessionManager.getDeviceId(session);
         String clipboardCode = sessionManager.getClipboardCode(session);
         sessionManager.leave(session);
@@ -351,15 +353,39 @@ public class ClipboardWebSocketHandler extends TextWebSocketHandler {
 
     private void handleTransferCancel(WebSocketSession session, JsonNode payload) {
         String transferCode = payload.path("transferCode").asText();
-        transferService.cancelTransfer(transferCode);
-
         String clipboardCode = sessionManager.getClipboardCode(session);
-        if (clipboardCode == null) return;
+        String deviceId = sessionManager.getDeviceId(session);
+        if (clipboardCode == null || deviceId == null) return;
+
+        TransferResponse transfer = transferService.getTransfer(transferCode);
+
+        // Only the two devices taking part may cancel. Otherwise any device that knows
+        // a transfer code can stop someone else's download.
+        if (!deviceId.equals(transfer.sourceDeviceId()) && !deviceId.equals(transfer.targetDeviceId())) {
+            throw new SecurityException("Only the devices in a transfer can cancel it");
+        }
+
+        transferService.cancelTransfer(transferCode);
 
         ObjectNode msg = objectMapper.createObjectNode();
         msg.put("type", "transfer_cancelled");
         msg.put("transferCode", transferCode);
-        broadcastToRoom(clipboardCode, msg.toString(), null);
+        // The cancelling device may explain why, which lets the other side show the
+        // cause instead of a bare "Transfer cancelled". The text is displayed, so it
+        // is capped rather than relayed at whatever length it arrives.
+        String reason = payload.path("reason").asText(null);
+        if (reason != null && !reason.isBlank()) {
+            msg.put("reason", reason.length() > MAX_CANCEL_REASON_LENGTH
+                    ? reason.substring(0, MAX_CANCEL_REASON_LENGTH)
+                    : reason);
+        }
+
+        // Both parties, and only them. Devices outside the transfer used to receive this
+        // and would show an error for something they had no part in. The canceller is
+        // included deliberately: its own copy of the message is what clears the entry
+        // from its transfer list.
+        broadcastToDevices(clipboardCode, msg.toString(),
+                transfer.sourceDeviceId(), transfer.targetDeviceId());
     }
 
     // --- Broadcast helpers ---
