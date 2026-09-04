@@ -3,12 +3,14 @@ package com.secureclipboard.config;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,15 +35,33 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) {
         return config.getAuthenticationManager();
     }
 
+    /**
+     * Static assets are public and identical for every visitor. The blanket no-store
+     * that Spring Security applies elsewhere would force a full re-download of the
+     * page and all fourteen ES modules on every visit, so this chain lets them be
+     * cached and revalidated instead: freshness comes from the conditional request.
+     */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http,
-                                           SecurityContextRepository securityContextRepository) throws Exception {
+    @Order(1)
+    public SecurityFilterChain staticAssetFilterChain(HttpSecurity http) {
         http
-            .csrf(csrf -> csrf.disable())
+            .securityMatcher("/css/**", "/js/**", "/img/**")
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+            .headers(headers -> headers.cacheControl(cache -> cache.disable()))
+            .csrf(AbstractHttpConfigurer::disable);
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           SecurityContextRepository securityContextRepository) {
+        http
+            .csrf(AbstractHttpConfigurer::disable)
             // Delegate CORS headers to WebConfig.addCorsMappings() via Spring MVC
             .cors(Customizer.withDefaults())
             .sessionManagement(session -> session
@@ -72,7 +92,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex
-                .authenticationEntryPoint((request, response, e) -> {
+                .authenticationEntryPoint((_, response, _) -> {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                     response.getWriter().write(
@@ -80,7 +100,7 @@ public class SecurityConfig {
                         "\"message\":\"Authentication required\"," +
                         "\"timestamp\":\"" + Instant.now() + "\"}");
                 })
-                .accessDeniedHandler((request, response, e) -> {
+                .accessDeniedHandler((_, response, e) -> {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                     response.getWriter().write(
