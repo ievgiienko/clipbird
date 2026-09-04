@@ -17,11 +17,17 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Account flows end to end: registration, sign-in, sign-out, and a file round trip
+ * made by a signed-in user.
+ *
+ * Each test registers its own account and opens the contexts it needs, so any one of
+ * them can be run on its own and none can be left broken by another.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestRedisConfig.class)
 @ActiveProfiles("test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class UserFlowE2ETest {
 
     @LocalServerPort
@@ -32,10 +38,7 @@ class UserFlowE2ETest {
     private String baseUrl;
 
     private static final String PASSWORD = "TestPassword123!";
-
-    private String email;
-    private String clipboardCode;
-    private Path uploadedFile;
+    private static final int FILE_SIZE = 100 * 1024;
 
     @TempDir
     Path tempDir;
@@ -59,146 +62,158 @@ class UserFlowE2ETest {
     }
 
     @Test
-    @Order(1)
+    @DisplayName("Registration signs the new account in")
     void registerUser() {
-
         BrowserContext context = browser.newContext();
-        Page page = context.newPage();
+        try {
+            Page page = context.newPage();
+            register(page, freshEmail());
 
-        email = "user-" + UUID.randomUUID() + "@test.com";
-
-        page.navigate(baseUrl + "/register");
-
-        page.locator("#reg-email").fill(email);
-        page.locator("#reg-password").fill(PASSWORD);
-        page.locator("#reg-password-confirm").fill(PASSWORD);
-
-        page.locator("#btn-register").click();
-
-        page.waitForURL(url -> url.contains("/dashboard"));
-
-        assertTrue(page.url().contains("/dashboard"));
-        assertTrue(page.locator("#btn-nav-logout").isVisible());
-
-        context.close();
+            assertTrue(page.url().contains("/dashboard"));
+            assertTrue(page.locator("#btn-nav-logout").isVisible());
+        } finally {
+            context.close();
+        }
     }
 
     @Test
-    @Order(2)
+    @DisplayName("A registered account can sign in again")
     void loginUser() {
+        String email = registerAccount();
 
         BrowserContext context = browser.newContext();
-        Page page = context.newPage();
+        try {
+            Page page = context.newPage();
+            login(page, email);
 
-        page.navigate(baseUrl + "/login");
-
-        page.locator("#login-email").fill(email);
-        page.locator("#login-password").fill(PASSWORD);
-
-        page.locator("#btn-login").click();
-
-        page.waitForURL(url -> url.contains("/dashboard"));
-
-        assertTrue(page.url().contains("/dashboard"));
-        assertTrue(page.locator("#btn-nav-logout").isVisible());
-
-        context.close();
+            assertTrue(page.url().contains("/dashboard"));
+            assertTrue(page.locator("#btn-nav-logout").isVisible());
+        } finally {
+            context.close();
+        }
     }
 
     @Test
-    @Order(3)
+    @DisplayName("Signing out returns to the login page")
     void logoutUser() {
+        String email = registerAccount();
 
         BrowserContext context = browser.newContext();
-        Page page = context.newPage();
+        try {
+            Page page = context.newPage();
+            login(page, email);
 
-        page.navigate(baseUrl + "/login");
+            page.locator("#btn-nav-logout").click();
+            page.waitForURL(url -> url.contains("/login"));
 
-        page.locator("#login-email").fill(email);
-        page.locator("#login-password").fill(PASSWORD);
-
-        page.locator("#btn-login").click();
-
-        page.waitForURL(url -> url.contains("/dashboard"));
-
-        page.locator("#btn-nav-logout").click();
-
-        page.waitForURL(url -> url.contains("/login"));
-
-        assertTrue(page.url().contains("/login"));
-
-        context.close();
+            assertTrue(page.url().contains("/login"));
+        } finally {
+            context.close();
+        }
     }
 
     @Test
-    @Order(4)
+    @DisplayName("A signed-in user can add a file to a clipboard")
     void uploadFile() throws Exception {
+        String email = registerAccount();
+        Path file = TestFileGenerator.generate(tempDir, "upload-test.txt", FILE_SIZE);
 
         BrowserContext context = browser.newContext();
-        Page page = context.newPage();
+        try {
+            Page page = context.newPage();
+            login(page, email);
 
-        page.navigate(baseUrl + "/login");
+            ClipboardActions.createClipboard(page, baseUrl, PASSWORD);
 
-        page.locator("#login-email").fill(email);
-        page.locator("#login-password").fill(PASSWORD);
+            page.setInputFiles("#file-input", file);
 
-        page.locator("#btn-login").click();
+            ClipboardActions.waitForFileCount(page, 1);
+            ClipboardActions.waitForTransfersComplete(page);
 
-        page.waitForURL(url -> url.contains("/dashboard"));
-
-        clipboardCode = ClipboardActions.createClipboard(
-                page,
-                baseUrl,
-                PASSWORD
-        );
-
-        uploadedFile = TestFileGenerator.generate(
-                tempDir,
-                "upload-test.txt",
-                1024 * 100
-        );
-
-        page.setInputFiles("#file-input", uploadedFile);
-
-        ClipboardActions.waitForFileCount(page, 1);
-        ClipboardActions.waitForTransfersComplete(page);
-
-        assertEquals(1, page.locator(".file-item").count());
-
-        context.close();
+            assertEquals(1, page.locator(".file-item").count());
+        } finally {
+            context.close();
+        }
     }
 
+    /**
+     * A file is served by the device that added it, so the source has to stay open for
+     * the whole download: the target only offers a Download button while the source is
+     * connected, and the bytes travel from it rather than from the server.
+     */
     @Test
-    @Order(5)
+    @DisplayName("A second device downloads the file the user uploaded")
     void downloadFile() throws Exception {
+        String email = registerAccount();
+        Path original = TestFileGenerator.generate(tempDir, "download-test.txt", FILE_SIZE);
 
+        BrowserContext sourceContext = browser.newContext();
+        BrowserContext targetContext = browser.newContext();
+        try {
+            Page source = sourceContext.newPage();
+            login(source, email);
+            String clipboardCode = ClipboardActions.createClipboard(source, baseUrl, PASSWORD);
+
+            Page target = targetContext.newPage();
+            ClipboardActions.openClipboard(target, baseUrl, clipboardCode, PASSWORD);
+
+            source.setInputFiles("#file-input", original);
+            ClipboardActions.waitForDownloadButtons(target, 1);
+
+            Download download = target.waitForDownload(
+                    new Page.WaitForDownloadOptions().setTimeout(60_000),
+                    () -> target.locator("button[data-action='download']").first().click()
+            );
+
+            Path downloadedFile = tempDir.resolve("downloaded-" + original.getFileName());
+            download.saveAs(downloadedFile);
+
+            assertTrue(Files.exists(downloadedFile));
+            assertTrue(Files.size(downloadedFile) > 0);
+
+            assertEquals(
+                    TestFileGenerator.sha256(original),
+                    TestFileGenerator.sha256(downloadedFile)
+            );
+        } finally {
+            sourceContext.close();
+            targetContext.close();
+        }
+    }
+
+    private String freshEmail() {
+        return "user-" + UUID.randomUUID() + "@test.com";
+    }
+
+    /**
+     * Register an account in a throwaway context, so the test's own context starts
+     * signed out and exercises the sign-in it is about.
+     */
+    private String registerAccount() {
+        String email = freshEmail();
         BrowserContext context = browser.newContext();
-        Page page = context.newPage();
+        try {
+            register(context.newPage(), email);
+        } finally {
+            context.close();
+        }
+        return email;
+    }
 
-        ClipboardActions.openClipboard(
-                page,
-                baseUrl,
-                clipboardCode,
-                PASSWORD
-        );
+    private void register(Page page, String email) {
+        page.navigate(baseUrl + "/register");
+        ClipboardActions.fillForm(page,
+                "#reg-email", email,
+                "#reg-password", PASSWORD,
+                "#reg-password-confirm", PASSWORD);
+        page.click("#btn-register");
+        page.waitForURL(url -> url.contains("/dashboard"));
+    }
 
-        ClipboardActions.waitForDownloadButtons(page, 1);
-
-        Download download = page.waitForDownload(() ->
-                page.locator("button[data-action='download']").first().click()
-        );
-
-        Path downloadedFile = tempDir.resolve("downloaded-upload-test.txt");
-        download.saveAs(downloadedFile);
-
-        assertTrue(Files.exists(downloadedFile));
-        assertTrue(Files.size(downloadedFile) > 0);
-
-        assertEquals(
-                TestFileGenerator.sha256(uploadedFile),
-                TestFileGenerator.sha256(downloadedFile)
-        );
-
-        context.close();
+    private void login(Page page, String email) {
+        page.navigate(baseUrl + "/login");
+        ClipboardActions.fillForm(page, "#login-email", email, "#login-password", PASSWORD);
+        page.click("#btn-login");
+        page.waitForURL(url -> url.contains("/dashboard"));
     }
 }
