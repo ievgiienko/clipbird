@@ -143,54 +143,52 @@ button.nav-link {
 /* Site Main  */
 
 .privacy-content, .terms-content, .refund-content {
-    margin:0 auto; 
     text-align:center;
-    margin-bottom:30px; 
-    margin-top: 30px;
+    margin: 30px auto;
 }
 .privacy-title, .terms-title, .refund-title {
-    font-size: 38px; 
+    font-size: 38px;
     font-weight: 800;
-     margin-bottom: 16px; 
-     color: #1e293b;
+    margin-bottom: 16px;
+    color: #1e293b;
 }
-.prvacy-subtitle, .terms-subtitle, .refund-subtitle {
+.privacy-subtitle, .terms-subtitle, .refund-subtitle {
     font-size: 20px;
-     font-weight: 400;
-      color:#64748b;
+    font-weight: 400;
+    color:#64748b;
 }
+
 .privacy-text, .terms-text, .refund-text {
-    max-width: 900px; 
      text-align: left;
       line-height: 1.8;
       color:#64748b;
-       margin-left: 40px;
 }
 .privacy-section, .terms-section, .refund-section {
-    margin-bottom: 40px;
+    margin-bottom: 32px;
 }
 .privacy-heading, .terms-heading, .refund-heading {
     color: #1e293b; 
     font-size: 1.5rem; 
     margin-bottom: 10px; 
 }
- .privacy-paragraph, .refund-paragraph {
-     margin-bottom: 15px;
- }
- .privacy-subheading{
-        color: #1e293b; 
-        font-size: 1.2rem; 
-        margin-bottom: 10px; 
-      
- }
- .privacy-list {
-      margin-left: 20px; 
-      margin-top: 10px;
- }
- .text-link {
-     color: #8b5cf6; 
-     text-decoration: none;
- }
+
+.privacy-paragraph, .refund-paragraph {
+    margin-bottom: 15px;
+}
+.privacy-subheading{
+    color: #1e293b;
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+}
+
+.privacy-list {
+  margin-left: 20px;
+  margin-top: 10px;
+}
+.text-link {
+ color: #8b5cf6;
+ text-decoration: none;
+}
 
 /* --- Site Footer --- */
 
@@ -216,11 +214,13 @@ button.nav-link {
 .footer-tagline {
     opacity: 0.7;
 }
+
 .footer-container a{
     text-decoration: none;
     color: var(--primary);
     margin: 0 6px;
 }
+
 .footer-container a:hover {
     text-decoration: underline;
     color: var(--primary-hover);
@@ -888,7 +888,7 @@ textarea {
 
 .empty-state {
     text-align: center;
-    padding: 3.5rem 1rem;
+    padding: 1rem;
     color: var(--text-muted);
 }
 
@@ -1444,13 +1444,6 @@ textarea {
     color: var(--text-muted);
 }
 
-.empty-state {
-    color: var(--text-muted);
-    text-align: center;
-    padding: 1rem;
-    /* font-style: italic; */
-}
-
 /* --- Copy feedback --- */
 
 .copy-feedback {
@@ -1639,11 +1632,13 @@ textarea,
 
     .file-item {
         flex-direction: column;
-        align-items: stretch;
+        align-items: flex-start;
+        gap: 0.5rem;
     }
 
     .file-item .file-actions {
         justify-content: stretch;
+        width: 100%;
     }
 
     .file-item .file-actions .btn {
@@ -1662,20 +1657,6 @@ textarea,
 
     .hero-action-hint {
         max-width: 100%;
-    }
-
-    .file-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
-
-    .file-item .file-actions {
-        width: 100%;
-    }
-
-    .file-item .file-actions .btn {
-        flex: 1;
     }
 
     .drop-zone {
