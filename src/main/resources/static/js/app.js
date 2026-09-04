@@ -7,7 +7,6 @@
  * - Adaptive chunk sizing: measures throughput on first chunk, adjusts for remaining
  * - Binary transport: encrypted chunks sent as raw bytes, not base64 JSON
  */
-console.log('1');
 import * as crypto from './crypto.js';
 import * as api from './api.js';
 import * as auth from './auth.js';
@@ -23,11 +22,7 @@ import { initTheme } from './theme.js';
 import { initPwa } from './pwa.js';
 import * as fileWriter from './file-writer.js';
 
-
-
-console.log('APPLOADED');
-
-const CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB default
+const CHUNK_SIZE = 1024 * 1024; // 1 MB default
 const TEXT_DEBOUNCE_MS = 500;
 
 // Adaptive chunk size constants
@@ -47,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setState({ deviceId: generateDeviceId() });
     bindEvents();
     passwordStrength.bind('create-password', 'password-strength');
-    auth.initNav(router.navigate);
+    auth.initNav();
     auth.initLoginPage(router.navigate);
     auth.initRegisterPage(router.navigate);
     router.init(onRouteChange);
@@ -148,6 +143,10 @@ function bindEvents() {
     // Deleted overlay: Go Home button
     document.getElementById('btn-deleted-go-home').addEventListener('click', cleanupAndGoHome);
 
+    // Copy the clipboard text
+    const copyBtn = document.getElementById('copy-btn');
+    if (copyBtn) copyBtn.addEventListener('click', () => copyClipboardText(copyBtn));
+
     // Keyboard: Escape closes modals
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -159,9 +158,39 @@ function bindEvents() {
 }
 
 
+async function copyClipboardText(btn) {
+    const original = btn.textContent;
+    try {
+        await navigator.clipboard.writeText(document.getElementById('clipboard-text').value);
+        btn.textContent = 'Copied!';
+        btn.disabled = true;
+        setTimeout(() => {
+            btn.textContent = original;
+            btn.disabled = false;
+        }, 2000);
+    } catch (err) {
+        ui.showError('clipboard-error', 'Copy failed: ' + err.message);
+    }
+}
+
 function onEnterKey(inputId, handler) {
     document.getElementById(inputId).addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); handler(); }
+    });
+}
+
+/**
+ * Put the caret in the first field of a page, unless something already has focus.
+ * The reset runs on route change, which can land after the user has started
+ * typing or pasting; taking focus back at that point moves their input into the
+ * wrong field.
+ */
+function focusIfIdle(elementId) {
+    requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (!active || active === document.body) {
+            document.getElementById(elementId)?.focus();
+        }
     });
 }
 
@@ -232,14 +261,14 @@ async function onRouteChange(route) {
         document.getElementById('create-password-confirm').value = '';
         passwordStrength.reset('password-strength');
         ui.hideError('create-error');
-        setTimeout(() => document.getElementById('create-password').focus(), 50);
+        focusIfIdle('create-password');
     }
 
     if (route.page === 'open') {
         document.getElementById('open-code').value = '';
         document.getElementById('open-password').value = '';
         ui.hideError('open-error');
-        setTimeout(() => document.getElementById('open-code').focus(), 50);
+        focusIfIdle('open-code');
     }
 }
 
@@ -568,13 +597,58 @@ async function connectToClipboard(clipboardCode, passwordHash) {
 
         // Display files
         if (clipState.files && clipState.files.length > 0) {
-            setState({ files: clipState.files });
-            await ui.renderFileList(clipState.files);
+            const files = await dropUnservableFiles(clipboardCode, clipState.files);
+            setState({ files });
+            await ui.renderFileList(files);
             updateDownloadAllButton();
         }
     } catch (err) {
         ui.showError('clipboard-error', err.message);
     }
+}
+
+/**
+ * Drop manifests this device can no longer serve.
+ *
+ * A local copy can disappear between visits: storage was cleared, the browser
+ * evicted it, or the engine refused to store the file and it only ever lived in
+ * memory. The manifest on the server outlives it, and other devices would keep
+ * offering a download that can never complete.
+ */
+async function dropUnservableFiles(clipboardCode, files) {
+    const state = getState();
+    const kept = [];
+
+    for (const file of files) {
+        if (file.sourceDeviceId !== state.deviceId) {
+            kept.push(file);
+            continue;
+        }
+
+        let present;
+        try {
+            present = Boolean(await fileStore.getFileMeta(file.fileCode));
+        } catch (err) {
+            // Storage did not answer, which is not the same as "the file is gone".
+            // Withdrawing a manifest on a transient failure would take the file away
+            // from every other device, so the file stays and the list still renders.
+            console.warn('Could not check local storage for', file.fileCode, err);
+            kept.push(file);
+            continue;
+        }
+
+        if (present) {
+            kept.push(file);
+            continue;
+        }
+
+        try {
+            await api.removeFile(clipboardCode, file.fileCode);
+            if (ws && ws.isConnected()) ws.send({ type: 'file_removed', fileCode: file.fileCode });
+        } catch { /* the manifest may already be gone */ }
+    }
+
+    return kept;
 }
 
 // --- WebSocket handlers ---
@@ -616,7 +690,7 @@ function setupWsHandlers(ws) {
                 state.activeTransfers.delete(code);
             }
         }
-        if (state.activeTransfers.size >= 0) ui.renderTransfers(state.activeTransfers);
+        ui.renderTransfers(state.activeTransfers);
     });
 
     ws.on('text_updated', async (msg) => {
@@ -755,18 +829,10 @@ async function processFiles(files) {
 
     const state = getState();
     if (!state.cryptoKey) {
-
-        console.error('NO CRYPTO KEY');
-    
-        alert('Подожди секунду и попробуй снова');
-    
+        ui.showError('clipboard-error', 'Encryption key is not ready yet. Try again in a moment.');
         return;
-    
-      }
-    
-     
-    
-        
+    }
+
     for (const file of files) {
         try {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
@@ -799,7 +865,15 @@ async function processFiles(files) {
                 encryptedPreviewIv
             });
 
-            await fileStore.storeFile(manifest.fileCode, file);
+            try {
+                await fileStore.storeFile(manifest.fileCode, file);
+            } catch (err) {
+                // The manifest already exists server-side. Without a local copy this
+                // device cannot serve the file, and any device joining later would see
+                // a download that always fails, so drop the manifest before reporting.
+                await api.removeFile(state.clipboardCode, manifest.fileCode);
+                throw err;
+            }
 
             state.files.push(manifest);
             await ui.renderFileList(state.files);
@@ -1065,6 +1139,15 @@ async function handleSendChunkRequest(msg) {
         ws.send(uploadedMsg);
     } catch (err) {
         console.error('Failed to send chunk:', err);
+        // The target is blocked waiting for this chunk and has no other way to learn
+        // that it will never arrive, so cancel instead of letting it time out.
+        try {
+            ws.send({
+                type: 'transfer_cancel',
+                transferCode,
+                reason: 'The sender could not read the file: ' + err.message
+            });
+        } catch { /* ws may be closed */ }
         ui.showError('clipboard-error', 'Failed to send file chunk: ' + err.message);
     }
 }
@@ -1436,7 +1519,6 @@ function handleDelete() {
 // --- Navigation helpers ---
 
 function cleanupAndGoHome() {
-    console.log("CLEANUP CALLED");
     if (ws) { ws.disconnect(); ws = null; }
     resetState();
     setState({ deviceId: generateDeviceId() });
@@ -1449,43 +1531,3 @@ function cleanupAndGoHome() {
     ui.hideDeletedOverlay();
     router.navigate('/');
 }
-
-
-
-
-
-document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('copy-btn');
-  
-    if (!btn) return;
-  
-    btn.addEventListener('click', async () => {
-      const textarea = document.getElementById('clipboard-text');
-      const text = textarea.value;
-  
-      try {
-        await navigator.clipboard.writeText(text);
-  
-        const originalText = btn.textContent;
-        btn.textContent = 'Copied!';
-        btn.disabled = true;
-  
-        setTimeout(() => {
-          btn.textContent = originalText;
-          btn.disabled = false;
-        }, 2000);
-  
-      } catch (err) {
-        console.error('Copy failed:', err);
-      }
-    });
-  });
-
-
-
-
-
-
-
-
-  

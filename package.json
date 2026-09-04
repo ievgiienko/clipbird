@@ -1,0 +1,19 @@
+{
+  "name": "secure-clipboard-frontend-checks",
+  "private": true,
+  "description": "Static checks for the browser sources. The application ships as plain ES modules and has no build step; these tools only read the files.",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint src/main/resources/static/js",
+    "lint:css": "stylelint \"src/main/resources/static/css/**/*.css\"",
+    "typecheck": "tsc --project jsconfig.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.9.1",
+    "globals": "^17.12.0",
+    "stylelint": "^17.14.1",
+    "stylelint-config-standard": "^40.0.0",
+    "typescript": "^7.0.2"
+  }
+}
