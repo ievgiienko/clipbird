@@ -199,6 +199,26 @@ function focusIfIdle(elementId) {
 async function onRouteChange(route) {
     const state = getState();
 
+    // The entry forms are cleared before anything on this path awaits. Behind an
+    // await the reset lands at an unpredictable moment, which on a slow machine is
+    // after the field already holds what someone typed or pasted into it.
+    if (route.page === 'create') {
+        ui.setTextContent('');
+        ui.setTextVersion(0);
+
+        document.getElementById('create-password').value = '';
+        document.getElementById('create-password-confirm').value = '';
+        passwordStrength.reset('password-strength');
+        ui.hideError('create-error');
+        focusIfIdle('create-password');
+    }
+
+    if (route.page === 'open') {
+        document.getElementById('open-code').value = '';
+        document.getElementById('open-password').value = '';
+        ui.hideError('open-error');
+        focusIfIdle('open-code');
+    }
 
     // Clean up WS and overlays if navigating away from clipboard
 
@@ -251,25 +271,6 @@ async function onRouteChange(route) {
         dashboard.show(user);
     }
 
-    if (route.page === 'create') {
-        resetState();
-        fileStore.clearAll();
-        ui.setTextContent('');
-        ui.setTextVersion(0);
-
-        document.getElementById('create-password').value = '';
-        document.getElementById('create-password-confirm').value = '';
-        passwordStrength.reset('password-strength');
-        ui.hideError('create-error');
-        focusIfIdle('create-password');
-    }
-
-    if (route.page === 'open') {
-        document.getElementById('open-code').value = '';
-        document.getElementById('open-password').value = '';
-        ui.hideError('open-error');
-        focusIfIdle('open-code');
-    }
 }
 
  
