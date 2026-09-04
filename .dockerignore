@@ -1,0 +1,16 @@
+# The image is built from sources; everything below is either local state or
+# output that the build produces again inside the container.
+build/
+.gradle/
+.git/
+node_modules/
+target/
+
+# Never let local secrets into the build context.
+.env
+
+# Not part of the application.
+docs/
+scripts/
+.github/
+*.md

@@ -1,15 +1,60 @@
-target/
-*.class
-*.jar
-*.war
+### Build output ###
+/build/
+/.gradle/
+out/
+bin/
 *.log
+
+### JVM crash artifacts ###
+# A fatal error drops these in the working directory of whatever died, which for
+# a run from the repository root is the repository root.
+core.[0-9]*
+
+### IntelliJ IDEA ###
 .idea/
 *.iml
-.vscode/
-.settings/
+*.iws
+*.ipr
+
+### Eclipse ###
 .classpath
 .project
+.settings/
+.apt_generated
+.factorypath
+
+### VS Code ###
+.vscode/
+
+### Local configuration and dependencies ###
 .env
 node_modules/
+
+### AI agents ###
+# This project allows working with them, but their files stay out of the repository.
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+AGENTS.md
+.codex/
+GEMINI.md
+.gemini/
+.cursor/
+.cursorrules
+.cursorignore
+.aider*
+.continue/
+.windsurf/
+.windsurfrules
+.codeium/
+.zed/
+.roo/
+.roomodes
+.cline/
+.github/copilot-instructions.md
+.specstory/
+.qodo/
+
+### OS noise ###
 .DS_Store
 Thumbs.db
