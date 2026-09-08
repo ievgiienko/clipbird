@@ -1,0 +1,74 @@
+name: deploy
+
+# Manual only. Automating this on a push to main is a separate decision: it puts the
+# production key behind every merge, so it should be made deliberately rather than
+# inherited from a template.
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: build and ship to the server
+    runs-on: ubuntu-latest
+    # Create an environment of this name to require an approval before a run starts.
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: temurin
+      - uses: gradle/actions/setup-gradle@v6
+
+      # A deploy that ships an untested build is how a broken prod happens quietly.
+      - name: Unit tests
+        run: ./gradlew test
+
+      - name: Build image
+        run: docker build -t clipbird-app .
+
+      # Plain ssh rather than a third-party action: this step handles the production
+      # key, and the fewer parties that touch it, the better.
+      - name: Prepare ssh
+        run: |
+          install -m 700 -d ~/.ssh
+          install -m 600 /dev/null ~/.ssh/deploy_key
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      # compose is not secret and changes with the repository, so it travels.
+      # .env stays on the server: it holds the database passwords and CI has no
+      # business knowing them.
+      - name: Ship compose file
+        run: |
+          scp -i ~/.ssh/deploy_key docker-compose.yml \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/root/docker-compose.yml"
+
+      - name: Ship image and restart
+        run: |
+          docker save clipbird-app | gzip | ssh -i ~/.ssh/deploy_key \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            'gunzip | docker load && cd /root && docker compose up -d --no-build app'
+
+      # Spring with Flyway and MySQL routinely takes longer than a fixed pause, so this
+      # polls instead of guessing. The port lives in the server's .env, not here.
+      - name: Wait for the service to answer
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" bash -s <<'REMOTE'
+          set -u
+          cd /root
+          PORT=$(grep -E '^SERVER_PORT=' .env | cut -d= -f2 | tr -d '\r')
+          PORT=${PORT:-8080}
+          for attempt in $(seq 1 60); do
+            code=$(curl -fsS -o /dev/null -w '%{http_code}' "http://localhost:${PORT}/" 2>/dev/null || true)
+            if [ "$code" = "200" ]; then
+              echo "service answered 200 after ${attempt} attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "service did not answer within 120 seconds, last code: ${code:-none}" >&2
+          docker compose logs --tail 50 app >&2 || true
+          exit 1
+          REMOTE

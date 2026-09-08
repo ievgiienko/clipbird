@@ -44,12 +44,17 @@ async function apiRegister(email, password) {
 }
 
 export async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {
+        // The caller reloads either way, and the session cookie expires on its own.
+        // A failed request here must not leave the user on a page that looks signed in.
+    }
 }
 
 // Nav auth state
 
-export async function initNav(navigateFn) {
+export async function initNav() {
     const user = await getCurrentUser();
     const guestNav = document.getElementById('nav-guest');
     const userNav  = document.getElementById('nav-user');
@@ -64,10 +69,16 @@ export async function initNav(navigateFn) {
         if (userNav)  userNav.style.display  = 'none';
     }
 
-    document.getElementById('btn-nav-logout')?.addEventListener('click', async () => {
-        await logout();
-        window.location.reload();
-    });
+    // initNav runs again after sign-in and after registration, so the listener is
+    // attached once per element rather than once per call.
+    const logoutBtn = document.getElementById('btn-nav-logout');
+    if (logoutBtn && !logoutBtn.dataset.logoutBound) {
+        logoutBtn.dataset.logoutBound = 'true';
+        logoutBtn.addEventListener('click', async () => {
+            await logout();
+            window.location.reload();
+        });
+    }
 }
 
 // Login page
@@ -92,7 +103,7 @@ export function initLoginPage(navigateFn) {
         btn.disabled = true;
         try {
             await apiLogin(email, password);
-            await initNav(navigateFn);
+            await initNav();
             navigateFn('/dashboard');
         } catch (err) {
             showError(errorEl, err.message);
@@ -134,7 +145,7 @@ export function initRegisterPage(navigateFn) {
             await apiRegister(email, password);
             // Auto-login after registration
             await apiLogin(email, password);
-            await initNav(navigateFn);
+            await initNav();
             navigateFn('/dashboard');
         } catch (err) {
             showError(errorEl, err.message);

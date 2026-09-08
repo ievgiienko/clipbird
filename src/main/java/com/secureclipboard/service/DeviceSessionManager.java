@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages WebSocket sessions grouped by clipboard code.
- *
+ * <p>
  * WebSocket session objects stay in-memory (they are not serializable).
  * Device presence metadata is mirrored to Redis via RedisSessionStore
  * for durability, TTL-based cleanup, and future horizontal scaling.
@@ -42,7 +42,7 @@ public class DeviceSessionManager {
         if (current >= maxDevices) {
             throw new IllegalStateException("Max devices reached for clipboard " + clipboardCode);
         }
-        rooms.computeIfAbsent(clipboardCode, k -> new ConcurrentHashMap<>())
+        rooms.computeIfAbsent(clipboardCode, _ -> new ConcurrentHashMap<>())
              .put(deviceId, session);
         sessionToDevice.put(session.getId(), deviceId);
         sessionToClipboard.put(session.getId(), clipboardCode);

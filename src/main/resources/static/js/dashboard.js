@@ -3,6 +3,8 @@
  * Renders into the static elements already present in #dashboard-page.
  */
 
+import { logout } from './auth.js';
+
 let currentPage = 0;
 let totalPages  = 0;
 let userEmail   = '';
@@ -18,10 +20,15 @@ export async function show(user) {
 
     await loadPage(0);
 
-    document.getElementById('btn-dashboard-logout')?.addEventListener('click', async () => {
-        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include'});
-        window.location.reload();
-    });
+    // show() runs on every navigation to the dashboard, so bind once per element.
+    const logoutBtn = document.getElementById('btn-dashboard-logout');
+    if (logoutBtn && !logoutBtn.dataset.logoutBound) {
+        logoutBtn.dataset.logoutBound = 'true';
+        logoutBtn.addEventListener('click', async () => {
+            await logout();
+            window.location.reload();
+        });
+    }
 }
 
 // Data loading
@@ -129,7 +136,10 @@ async function handleDelete(code) {
         const res = await fetch(`/api/clipboards/${encodeURIComponent(code)}`, { method: 'DELETE', credentials: 'include' });
         if (!res.ok && res.status !== 204) throw new Error('Delete failed');
         // Remove card immediately, then reload current page
-        document.querySelector(`[data-code="${esc(code)}"]`)?.remove();
+        // esc() экранирует для HTML, а не для селектора. Сравнение по dataset обходит
+        // вопрос экранирования целиком.
+        [...document.querySelectorAll('.clipboard-card')]
+            .find(card => card.dataset.code === code)?.remove();
         await loadPage(currentPage);
     } catch (err) {
         alert('Could not delete clipboard: ' + err.message);

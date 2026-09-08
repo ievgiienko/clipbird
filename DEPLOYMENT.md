@@ -137,24 +137,70 @@ sudo certbot --nginx -d clipboard.example.com
 # Auto-renewal is configured automatically
 ```
 
+## Continuous Integration and Deployment
+
+Two workflows live in `.github/workflows`.
+
+`tests.yml` runs on every pull request and on pushes to `main`. It has three jobs:
+`unit tests` (no browsers, around two minutes), `frontend checks` (ESLint and stylelint
+over the browser sources, under half a minute) and `browser tests` (installs the
+Playwright bundles, then runs the e2e suite, five to seven minutes). The e2e report is
+kept as a run artifact when that job fails.
+
+`deploy.yml` is manual only, started from the Actions tab. It runs the unit tests,
+builds the image, ships it to the server over ssh, restarts the `app` service and
+checks that the service answers. The compose file travels with it; `.env` does not,
+because it holds the database passwords and stays on the server.
+
+### One-time setup
+
+1. **Secrets.** Settings, Secrets and variables, Actions, New repository secret. Three
+   are needed:
+
+   | Name          | Value                                                         |
+   |---------------|---------------------------------------------------------------|
+   | `VPS_HOST`    | server address                                                |
+   | `VPS_USER`    | ssh user used for the deploy                                  |
+   | `VPS_SSH_KEY` | that user's private key, whole file including the header line |
+
+2. **Deploy approval.** Settings, Environments, New environment, name it `production`.
+   Adding yourself under Required reviewers makes every deploy wait for a click.
+
+3. **Required checks.** Settings, Rules or Branches, add a rule for `main`, enable
+   Require status checks to pass, and select all three of `unit tests`, `frontend
+   checks` and `browser tests`. Only an account with the Admin role can do this.
+
+### Notes
+
+The workflow deploys as `root` into `/root`, the same way the previous manual script
+did, so an existing server needs no changes. A dedicated account in the `docker` group
+would be the better arrangement, since a key restricted to it is easier to rotate than a
+root key; switching means changing the two `/root` paths in `deploy.yml` and pointing
+`VPS_USER` at the new account. Whatever key goes into `VPS_SSH_KEY` should exist only
+for this purpose.
+
+Automating the deploy on merge is deliberately not enabled: it would put the production
+key behind every merge. Changing `on: workflow_dispatch` to also trigger on a push to
+`main` is a one-line edit once that is a conscious decision.
+
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DB_HOST` | Yes | localhost | MySQL host |
-| `DB_PORT` | No | 3306 | MySQL port |
-| `DB_NAME` | No | secure_clipboard | Database name |
-| `DB_USER` | Yes | clipboard_user | Database user |
-| `DB_PASSWORD` | Yes | clipboard_pass | Database password |
-| `SERVER_PORT` | No | 8080 | Application port |
-| `CLIPBOARD_TTL_HOURS` | No | 24 | Clipboard lifetime |
-| `CHUNK_SIZE` | No | 5242880 | Transfer chunk size (bytes) |
-| `MAX_TEXT_SIZE` | No | 10485760 | Max text size (bytes) |
-| `MAX_FILE_SIZE` | No | 524288000 | Max file size (bytes) |
-| `SPRING_PROFILES_ACTIVE` | No | default | Spring profile |
-| `CLIPBOARD_ID_LENGTH` | No | 8 | Clipboard code length |
-| `CLEANUP_INTERVAL` | No | 300 | Cleanup run interval (seconds) |
-| `TRANSFER_TIMEOUT` | No | 600 | Transfer timeout (seconds) |
+| Variable                 | Required | Default          | Description                    |
+|--------------------------|----------|------------------|--------------------------------|
+| `DB_HOST`                | Yes      | localhost        | MySQL host                     |
+| `DB_PORT`                | No       | 3306             | MySQL port                     |
+| `DB_NAME`                | No       | secure_clipboard | Database name                  |
+| `DB_USER`                | Yes      | clipboard_user   | Database user                  |
+| `DB_PASSWORD`            | Yes      | clipboard_pass   | Database password              |
+| `SERVER_PORT`            | No       | 8080             | Application port               |
+| `CLIPBOARD_TTL_HOURS`    | No       | 24               | Clipboard lifetime             |
+| `CHUNK_SIZE`             | No       | 5242880          | Transfer chunk size (bytes)    |
+| `MAX_TEXT_SIZE`          | No       | 10485760         | Max text size (bytes)          |
+| `MAX_FILE_SIZE`          | No       | 524288000        | Max file size (bytes)          |
+| `SPRING_PROFILES_ACTIVE` | No       | default          | Spring profile                 |
+| `CLIPBOARD_ID_LENGTH`    | No       | 8                | Clipboard code length          |
+| `CLEANUP_INTERVAL`       | No       | 300              | Cleanup run interval (seconds) |
+| `TRANSFER_TIMEOUT`       | No       | 600              | Transfer timeout (seconds)     |
 
 ## MySQL Notes
 
