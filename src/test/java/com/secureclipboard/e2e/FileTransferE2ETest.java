@@ -570,6 +570,98 @@ class FileTransferE2ETest {
         }
     }
 
+    /**
+     * Wipes the source device's local copies without touching the server, the way a
+     * browser eviction or a cleared site storage would.
+     */
+    private void clearLocalFileStore(Page page) {
+        page.evaluate("() => new Promise((resolve, reject) => {" +
+                "  const req = indexedDB.open('SecureClipboardFiles', 1);" +
+                "  req.onsuccess = () => {" +
+                "    const db = req.result;" +
+                "    const tx = db.transaction('files', 'readwrite');" +
+                "    tx.objectStore('files').clear();" +
+                "    tx.oncomplete = () => { db.close(); resolve(); };" +
+                "    tx.onerror = () => reject(tx.error);" +
+                "  };" +
+                "  req.onerror = () => reject(req.error);" +
+                "})");
+    }
+
+    @Test
+    @Order(42)
+    @DisplayName("Target is told when the source can no longer read the file")
+    void transfer_sourceLostLocalCopy() throws Exception {
+        Path testFile = TestFileGenerator.generate(tempDir, "lost_copy.bin", 2 * CHUNK_SIZE);
+
+        BrowserContext srcCtx = browser.newContext();
+        BrowserContext tgtCtx = browser.newContext();
+        try {
+            Page src = srcCtx.newPage();
+            Page tgt = tgtCtx.newPage();
+
+            String code = ClipboardActions.createClipboard(src, baseUrl, PASSWORD);
+            ClipboardActions.openClipboard(tgt, baseUrl, code, PASSWORD);
+
+            src.setInputFiles("#file-input", testFile);
+            tgt.waitForSelector("button[data-action='download']",
+                    new Page.WaitForSelectorOptions().setTimeout(60_000));
+
+            clearLocalFileStore(src);
+            tgt.click("button[data-action='download']");
+
+            // Without the cancel signal the target would sit here until its own timeout.
+            tgt.waitForFunction(
+                    "() => { const el = document.getElementById('clipboard-error');" +
+                    " return el && el.style.display === 'block' && el.textContent.trim().length > 0; }",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(30_000));
+
+            String message = tgt.textContent("#clipboard-error");
+            assertTrue(message.toLowerCase().contains("could not read"),
+                    "Target should be told why the transfer stopped, got: " + message);
+        } finally {
+            srcCtx.close();
+            tgtCtx.close();
+        }
+    }
+
+    @Test
+    @Order(43)
+    @DisplayName("Manifest is dropped when the source reconnects without its copy")
+    void transfer_staleManifestDroppedOnReconnect() throws Exception {
+        Path testFile = TestFileGenerator.generate(tempDir, "stale_manifest.bin", 4096);
+
+        BrowserContext srcCtx = browser.newContext();
+        BrowserContext tgtCtx = browser.newContext();
+        try {
+            Page src = srcCtx.newPage();
+            Page tgt = tgtCtx.newPage();
+
+            String code = ClipboardActions.createClipboard(src, baseUrl, PASSWORD);
+            ClipboardActions.openClipboard(tgt, baseUrl, code, PASSWORD);
+
+            src.setInputFiles("#file-input", testFile);
+            ClipboardActions.waitForFileCount(tgt, 1);
+
+            // The copy is gone, but the server still has the manifest.
+            clearLocalFileStore(src);
+            ClipboardActions.openClipboardViaUrl(src, baseUrl, code, PASSWORD);
+
+            // Reconnecting, the source finds it cannot serve the file and withdraws it.
+            tgt.waitForFunction(
+                    "() => document.querySelectorAll('.file-item').length === 0",
+                    null,
+                    new Page.WaitForFunctionOptions().setTimeout(30_000));
+
+            assertEquals(0, src.locator(".file-item").count(),
+                    "Source should not list a file it can no longer serve");
+        } finally {
+            srcCtx.close();
+            tgtCtx.close();
+        }
+    }
+
     @Test
     @Order(40)
     @DisplayName("File unavailable when source goes offline")

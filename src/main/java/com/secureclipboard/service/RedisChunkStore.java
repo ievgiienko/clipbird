@@ -10,7 +10,7 @@ import java.time.Duration;
 /**
  * Stores temporary encrypted file chunks in Redis.
  * Each chunk is stored as raw bytes with a TTL for automatic cleanup.
- *
+ * <p>
  * Key structure:
  *   cb:chunk:{transferCode}:{chunkNo}      → byte[] (encrypted chunk data)
  *   cb:chunk:{transferCode}:{chunkNo}:iv   → String (IV for decryption)

@@ -14,7 +14,7 @@ import java.util.Set;
  * Stores device presence and session metadata in Redis.
  * WebSocket session objects remain in-memory (they are not serializable);
  * this store tracks presence state for potential horizontal scaling.
- *
+ * <p>
  * Key structure:
  *   cb:presence:{clipboardCode}              → Hash { deviceId → lastSeen ISO instant }
  *   cb:ws:{sessionId}                        → Hash { "deviceId" → ..., "clipboardCode" → ... }

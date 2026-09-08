@@ -16,7 +16,7 @@
  *  - Chrome extension requests
  */
 
-const CACHE_NAME = 'clipbird-shell-v6';
+const CACHE_NAME = 'clipbird-shell-v7';
 
 const SHELL_ASSETS = [
   '/',
@@ -24,6 +24,9 @@ const SHELL_ASSETS = [
   '/css/styles.css',
   '/js/app.js',
   '/js/api.js',
+  '/js/auth.js',
+  '/js/dashboard.js',
+  '/js/file-writer.js',
   '/js/crypto.js',
   '/js/file-store.js',
   '/js/password-strength.js',

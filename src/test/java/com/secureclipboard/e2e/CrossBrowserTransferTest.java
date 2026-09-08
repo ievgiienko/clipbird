@@ -3,6 +3,7 @@ package com.secureclipboard.e2e;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.WaitForSelectorState;
 import com.secureclipboard.TestRedisConfig;
+import com.secureclipboard.e2e.helper.ClipboardActions;
 import com.secureclipboard.e2e.helper.TestFileGenerator;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -119,8 +120,7 @@ class CrossBrowserTransferTest {
 
     private String createClipboard(Page page) {
         page.navigate(baseUrl + "/create");
-        page.fill("#create-password", PASSWORD);
-        page.fill("#create-password-confirm", PASSWORD);
+        ClipboardActions.fillForm(page, "#create-password", PASSWORD, "#create-password-confirm", PASSWORD);
         page.click("#btn-create");
         page.waitForSelector("#clipboard-unlocked",
                 new Page.WaitForSelectorOptions()
@@ -133,8 +133,7 @@ class CrossBrowserTransferTest {
 
     private void openClipboard(Page page, String code) {
         page.navigate(baseUrl + "/open");
-        page.fill("#open-code", code);
-        page.fill("#open-password", PASSWORD);
+        ClipboardActions.fillForm(page, "#open-code", code, "#open-password", PASSWORD);
         page.click("#btn-open");
         page.waitForSelector("#clipboard-unlocked",
                 new Page.WaitForSelectorOptions()

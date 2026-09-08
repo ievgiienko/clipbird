@@ -10,6 +10,7 @@
 
 // --- EC Level M parameters per version ---
 // [totalCodewords, dataCodewords, ecPerBlock, [[numBlocks, dataPerBlock], ...]]
+/** @type {(null | [number, number, number, number[][]])[]} */
 const VERSIONS = [
     null,
     [26,  16,  10, [[1, 16]]],
@@ -25,6 +26,7 @@ const VERSIONS = [
 ];
 
 // Alignment pattern center coordinates per version
+/** @type {(null | number[])[]} */
 const ALIGN_POS = [
     null, [], [6,18], [6,22], [6,26], [6,30],
     [6,34], [6,22,38], [6,24,42], [6,26,46], [6,28,50],
@@ -167,13 +169,6 @@ function makeMatrix(version) {
     return { matrix, reserved, size };
 }
 
-function setModule(m, r, c, dark) {
-    if (r >= 0 && r < m.size && c >= 0 && c < m.size) {
-        m.matrix[r][c] = dark;
-        m.reserved[r][c] = true;
-    }
-}
-
 function placeFinderPattern(m, row, col) {
     for (let r = -1; r <= 7; r++) {
         for (let c = -1; c <= 7; c++) {
@@ -282,7 +277,7 @@ function placeData(m, codewords) {
 
 const MASK_FNS = [
     (r, c) => (r + c) % 2 === 0,
-    (r, c) => r % 2 === 0,
+    (r) => r % 2 === 0,
     (r, c) => c % 3 === 0,
     (r, c) => (r + c) % 3 === 0,
     (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
@@ -459,7 +454,6 @@ export function generateQR(text) {
     placeFunctionPatterns(m, version);
     placeData(m, codewords);
 
-    let bestMask = 0;
     let bestPenalty = Infinity;
     let bestMatrix = null;
 
@@ -470,7 +464,6 @@ export function generateQR(text) {
         const p = computePenalty(masked);
         if (p < bestPenalty) {
             bestPenalty = p;
-            bestMask = mask;
             bestMatrix = masked;
         }
     }

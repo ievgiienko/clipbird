@@ -3,6 +3,7 @@ package com.secureclipboard.service;
 import com.secureclipboard.domain.User;
 import com.secureclipboard.dto.UserSummaryResponse;
 import com.secureclipboard.repository.UserRepository;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -23,7 +24,8 @@ public class AuthService implements UserDetailsService {
     }
 
     @Override
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+    @NonNull
+    public UserDetails loadUserByUsername(@NonNull String email) throws UsernameNotFoundException {
         String normalizedEmail = normalizeEmail(email);
         User user = userRepository.findByEmail(normalizedEmail)
             .orElseThrow(() -> new UsernameNotFoundException("No user with email: " + normalizedEmail));
