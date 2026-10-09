@@ -1,0 +1,77 @@
+# Dependabot keeps the Gradle version catalog, the frontend npm tooling, the
+# GitHub Actions in the workflows, and the Docker base image current. Bumps are
+# grouped so a quiet week arrives as a few reviewable PRs instead of a swarm.
+# Majors stay out of the groups so each one lands on its own with its own CI run.
+version: 2
+
+updates:
+  # Gradle reads gradle/libs.versions.toml, the single source of truth, and the
+  # build.gradle.kts that references it.
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+    groups:
+      gradle-minor-patch:
+        patterns: ["*"]
+        # Playwright stays out of the group. The Java binding pulls new browser
+        # revisions, so a bump means re-running scripts/setup-e2e.sh on dev
+        # machines, and it should arrive on its own so that step is not missed.
+        exclude-patterns:
+          - "com.microsoft.playwright:*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # telegrambots 6.9.7.1 is the last release under these coordinates. 7.x
+      # moved to split longpolling and webhook starters, which is a code change
+      # rather than a version bump, so the major is handled by hand.
+      - dependency-name: "org.telegram:telegrambots-spring-boot-starter"
+        update-types:
+          - version-update:semver-major
+
+  # Frontend static-check tooling in the root package.json (eslint, stylelint,
+  # typescript). The app itself ships as plain ES modules with no build step.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+    groups:
+      npm-minor-patch:
+        patterns: ["*"]
+        update-types:
+          - minor
+          - patch
+
+  # Actions referenced by .github/workflows/*.yml.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Base image in the Dockerfile. The tag changes only on a new JDK line, and the
+  # project is pinned to Java 25 across the Dockerfile and setup-java, so this
+  # fires rarely and each bump is a deliberate runtime upgrade to review.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
