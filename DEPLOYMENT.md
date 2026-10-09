@@ -141,9 +141,11 @@ sudo certbot --nginx -d clipboard.example.com
 
 Two workflows live in `.github/workflows`.
 
-`tests.yml` runs on every pull request and on pushes to `main`. It has two jobs: `unit
-tests` (no browsers, about half a minute) and `browser tests` (installs the Playwright
-bundles, then runs the e2e suite).
+`tests.yml` runs on every pull request and on pushes to `main`. It has three jobs:
+`unit tests` (no browsers, around two minutes), `frontend checks` (ESLint and stylelint
+over the browser sources, under half a minute) and `browser tests` (installs the
+Playwright bundles, then runs the e2e suite, five to seven minutes). The e2e report is
+kept as a run artifact when that job fails.
 
 `deploy.yml` is manual only, started from the Actions tab. It runs the unit tests,
 builds the image, ships it to the server over ssh, restarts the `app` service and
@@ -165,8 +167,8 @@ because it holds the database passwords and stays on the server.
    Adding yourself under Required reviewers makes every deploy wait for a click.
 
 3. **Required checks.** Settings, Rules or Branches, add a rule for `main`, enable
-   Require status checks to pass, and select `unit tests` and `browser tests`. Only an
-   account with the Admin role can do this.
+   Require status checks to pass, and select all three of `unit tests`, `frontend
+   checks` and `browser tests`. Only an account with the Admin role can do this.
 
 ### Notes
 
