@@ -11,7 +11,7 @@ springBoot           = "4.1.1"
 # authentication, so the exposure is theoretical, but the bump costs nothing.
 tomcat               = "11.0.25"
 springDependencyMgmt = "1.1.7"
-versionsPlugin       = "0.65.0"
+versionsPlugin       = "0.66.0"
 
 # ── Pinned libraries ─────────────────────────────────────────────────────────
 # Everything Spring manages is versionless below and comes from the Boot BOM.
