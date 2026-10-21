@@ -84,7 +84,7 @@ function bindEvents() {
 
 
     // Clipboard page
-    document.getElementById('btn-delete').addEventListener('click', () => ui.showDeleteModal());
+    document.getElementById('btn-delete').addEventListener('click', () => ui.showDeleteModal(null, handleDelete));
     document.getElementById('btn-copy-link').addEventListener('click', handleCopyLink);
     document.getElementById('btn-show-qr').addEventListener('click', handleShowQr);
     document.getElementById('clipboard-text').addEventListener('input', handleTextInput);
@@ -133,7 +133,7 @@ function bindEvents() {
     });
 
     // Delete confirmation modal
-    document.getElementById('btn-confirm-delete').addEventListener('click', handleDelete);
+    document.getElementById('btn-confirm-delete').addEventListener('click', ui.confirmDeleteModal);
     document.getElementById('btn-cancel-delete').addEventListener('click', ui.hideDeleteModal);
     document.getElementById('btn-close-delete').addEventListener('click', ui.hideDeleteModal);
     document.getElementById('confirm-delete-modal').addEventListener('click', (e) => {
