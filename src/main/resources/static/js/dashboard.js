@@ -4,6 +4,7 @@
  */
 
 import { logout } from './auth.js';
+import * as ui from './ui.js';
 
 let currentPage = 0;
 let totalPages  = 0;
@@ -78,7 +79,7 @@ function renderList(container, items) {
     container.innerHTML = items.map(item => clipboardCard(item)).join('');
 
     container.querySelectorAll('[data-delete-code]').forEach(btn => {
-        btn.addEventListener('click', () => handleDelete(btn.dataset.deleteCode));
+        btn.addEventListener('click', () => requestDeleteConfirmation(btn.dataset.deleteCode));
     });
 }
 
@@ -129,8 +130,11 @@ function renderPagination(container, total, current, totalElements, size) {
 
 // Actions
 
-async function handleDelete(code) {
-    if (!confirm(`Delete clipboard ${code}? This cannot be undone.`)) return;
+function requestDeleteConfirmation(code) {
+    ui.showDeleteModal(code, () => deleteClipboard(code));
+}
+
+async function deleteClipboard(code) {
 
     try {
         const res = await fetch(`/api/clipboards/${encodeURIComponent(code)}`, { method: 'DELETE', credentials: 'include' });

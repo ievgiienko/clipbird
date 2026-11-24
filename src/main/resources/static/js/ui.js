@@ -5,6 +5,8 @@
 import { getState } from './state.js';
 import { decryptString, decryptChunkBinary, base64ToBytes } from './crypto.js';
 
+let pendingDeleteAction = null;
+
 // --- Page navigation ---
 
 export function showPage(pageId) {
@@ -132,12 +134,32 @@ export function hideQrModal() {
 
 // --- Delete confirmation modal ---
 
-export function showDeleteModal() {
+export function showDeleteModal(code = null, onConfirm = null) {
+    const codeElement = document.getElementById('delete-clipboard-code');
+
+    if (code) {
+        codeElement.textContent = `clipboard ${code}`;
+    } else {
+        codeElement.textContent = 'this clipboard';
+    }
+    pendingDeleteAction = onConfirm;
+
     document.getElementById('confirm-delete-modal').style.display = 'flex';
 }
 
 export function hideDeleteModal() {
     document.getElementById('confirm-delete-modal').style.display = 'none';
+    pendingDeleteAction = null;
+}
+
+export async function confirmDeleteModal() {
+    const action = pendingDeleteAction;
+
+    hideDeleteModal();
+
+    if (action) {
+        await action();
+    }
 }
 
 // --- Text area ---
