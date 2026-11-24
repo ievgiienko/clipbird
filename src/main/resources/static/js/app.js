@@ -35,7 +35,7 @@ let ws = null;
 // --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', () => {
-  
+
     initTheme();
     initPwa();
     fileWriter.cleanupOrphans();
@@ -222,12 +222,12 @@ async function onRouteChange(route) {
 
     // Clean up WS and overlays if navigating away from clipboard
 
-    
+
     if (route.page !== 'clipboard') {
-      
-        if(ws){
+
+        if (ws) {
             ws.disconnect();
-            ws=null;
+            ws = null;
         }
         resetState();
         await fileStore.clearAll();
@@ -237,23 +237,23 @@ async function onRouteChange(route) {
 
     if (route.page === 'clipboard' && route.code) {
 
-     
+
         // Trusted-device flow: read password from URL fragment and strip it immediately.
         // The fragment is never sent to the server (RFC 3986).
         // replaceState removes it from the address bar and current history entry.
         const fragmentPassword = readAndStripFragment();
 
 
-        if ( state.clipboardCode === route.code && state.cryptoKey) {
+        if (state.clipboardCode === route.code && state.cryptoKey) {
             // Already authenticated for this clipboard
 
-         
+
             showViewPasswordButton();
 
         }
 
 
-         else if (fragmentPassword) {
+        else if (fragmentPassword) {
             // Auto-authenticate using password from QR fragment
             autoOpenFromFragment(route.code, fragmentPassword);
         } else {
@@ -273,7 +273,7 @@ async function onRouteChange(route) {
 
 }
 
- 
+
 // --- Fragment handling (trusted-device flow) ---
 
 /**
@@ -779,7 +779,7 @@ function handleTextInput() {
     setState({
         textUpdateTimer: setTimeout(() => sendTextUpdate(text), TEXT_DEBOUNCE_MS)
     });
-    
+
 }
 
 
@@ -834,11 +834,11 @@ async function processFiles(files) {
         return;
     }
 
-    for (const file of files) {
+    for (const { file, relativePath } of files) {
         try {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-            const encName = await crypto.encryptString(state.cryptoKey, file.name);
+            const encName = await crypto.encryptString(state.cryptoKey, relativePath);
             const encMime = file.type
                 ? await crypto.encryptString(state.cryptoKey, file.type)
                 : { ciphertext: '', iv: '' };
@@ -882,13 +882,21 @@ async function processFiles(files) {
 
             ws.send({ type: 'file_added', file: manifest });
         } catch (err) {
-            ui.showError('clipboard-error', 'Failed to add file: ' + err.message);
+            ui.showError(
+                'clipboard-error',
+                `Failed to add "${relativePath}": ${err.message}`
+            );
         }
     }
 }
 
 async function handleFilesSelected(event) {
-    await processFiles(event.target.files);
+    const files = [...event.target.files].map(file => ({
+        file,
+        relativePath: file.name
+    }));
+
+    await processFiles(files);
     event.target.value = '';
 }
 
@@ -927,10 +935,101 @@ async function handleDrop(e) {
         return;
     }
 
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-        await processFiles(files);
+    const dropped = await collectDroppedFiles(e.dataTransfer.items);
+
+    if (dropped.files.length === 0) {
+        const message = dropped.includesDirectory
+            ? 'The dropped folder is empty'
+            : 'No files were found in the dropped item';
+
+        ui.showError('clipboard-error', message);
+        return;
     }
+
+    await processFiles(dropped.files);
+}
+
+function getEntry(item) {
+    return item.getAsEntry?.() ?? item.webkitGetAsEntry?.() ?? null;
+}
+
+function getFileFromEntry(entry) {
+    return new Promise((resolve, reject) => {
+        entry.file(resolve, reject);
+    });
+}
+// DirectoryReader returns entries in batches; an empty batch means completion.
+function readAllDirectoryEntries(directoryEntry) {
+    const reader = directoryEntry.createReader();
+    const entries = [];
+
+    return new Promise((resolve, reject) => {
+        function readBatch() {
+            reader.readEntries(batch => {
+                if (batch.length === 0) {
+                    resolve(entries);
+                    return;
+                }
+
+                entries.push(...batch);
+                readBatch();
+            }, reject);
+        }
+
+        readBatch();
+    });
+}
+
+async function collectEntry(entry, parentPath = '') {
+    if (entry.isFile) {
+        const file = await getFileFromEntry(entry);
+
+        return [{
+            file,
+            relativePath: `${parentPath}${file.name}`
+        }];
+    }
+
+    if (entry.isDirectory) {
+        const children = await readAllDirectoryEntries(entry);
+        const directoryPath = `${parentPath}${entry.name}/`;
+
+        const nestedFiles = await Promise.all(
+            children.map(child => collectEntry(child, directoryPath))
+        );
+
+        return nestedFiles.flat();
+    }
+
+    return [];
+}
+
+async function collectDroppedFiles(items) {
+    const fileItems = [...items].filter(item => item.kind === 'file');
+    const entries = fileItems.map(item => getEntry(item));
+
+    const fileGroups = await Promise.all(
+        fileItems.map(async (item, index) => {
+            const entry = entries[index];
+
+            if (entry) {
+                return collectEntry(entry);
+            }
+
+            // Fallback for a browser that provides a plain file
+            // but does not expose a FileSystemEntry.
+            const file = item.getAsFile();
+
+            return file
+                ? [{ file, relativePath: file.name }]
+                : [];
+        })
+    );
+
+    return {
+        files: fileGroups.flat(),
+        includesDirectory: entries.some(entry => entry?.isDirectory)
+    };
 }
 
 // --- File actions ---
@@ -1455,7 +1554,7 @@ async function refreshFileList() {
         await ui.renderFileList(clipState.files);
         updateDownloadAllButton();
     } catch { /* ignore refresh errors */ }
-    
+
 }
 
 // --- Copy link ---
