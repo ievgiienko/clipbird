@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 
 import java.time.Duration;
 import java.util.*;
@@ -136,6 +138,17 @@ public class TestRedisConfig {
 
         when(template.expire(anyString(), any(Duration.class))).thenReturn(true);
         when(template.expire(anyString(), anyLong(), any(TimeUnit.class))).thenReturn(true);
+
+        return template;
+    }
+
+    @Bean
+    public StringRedisTemplate stringRedisTemplate() {
+        StringRedisTemplate template = mock(StringRedisTemplate.class);
+
+        doReturn(List.of(1L, 60000L))
+                .when(template)
+                .execute(any(RedisScript.class), anyList());
 
         return template;
     }
